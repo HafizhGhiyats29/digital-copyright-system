@@ -1,0 +1,47 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.so
+
+# === Virtual Environment ===
+env/
+venv/
+ENV/
+.venv/
+
+# === IDE / Editor ===
+.vscode/
+.idea/
+
+# === OS Files ===
+.DS_Store
+Thumbs.db
+
+# === Logs ===
+*.log
+
+# === Byte-compiled / Cache ===
+*.egg-info/
+.eggs/
+.cache/
+
+# === Jupyter Notebook Checkpoints ===
+.ipynb_checkpoints/
+
+# === Distribution / Packaging ===
+build/
+dist/
+*.egg
+*.whl
+pip-wheel-metadata/
+
+# === Local Settings ===
+*.env
+*.local
+
+# === Other Temp Files ===
+*.tmp
+*.temp
