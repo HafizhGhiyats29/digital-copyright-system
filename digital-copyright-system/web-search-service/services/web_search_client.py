@@ -1,22 +1,68 @@
-import httpx
-from config.settings import config
+import httpx  # untuk HTTP request
+from config.settings import config  # ambil config
+from services.cloudinary_client import upload_image, delete_image  # upload & delete image
+from utils.logger import logger  # logger
 
-SERPAPI_KEY = config["serpapi_key"]
+SERPAPI_KEY = config["serpapi_key"]  # ambil API key
 
 
-async def search_image():
+async def search_image(image_bytes):
 
-    params = {
-        "engine": "google_lens",
-        "url": "https://drive.google.com/uc?export=view&id=1uR9gIO0u0aIjQxinmt3z7N6f4LL0AdMX",
-        "api_key": SERPAPI_KEY
-    }
+    # 1. upload ke cloudinary
+    image_url, public_id = upload_image(image_bytes)
+    logger.info(f"Uploaded image to Cloudinary: {image_url}")
 
-    async with httpx.AsyncClient(timeout=60) as client:
+    try:
+        # 2. call serpapi
+        params = {
+            "engine": "google_lens",
+            "url": image_url,
+            "api_key": SERPAPI_KEY
+        }
 
-        response = await client.get(
-            "https://serpapi.com/search",
-            params=params
-        )
+        async with httpx.AsyncClient(timeout=60) as client:
 
-        return response.json()
+            response = await client.get(
+                "https://serpapi.com/search",
+                params=params
+            )
+
+            data = response.json()
+            logger.info("SerpAPI response received")
+
+        # 3. ambil kandidat + metadata
+        visual_matches = data.get("visual_matches", [])
+
+        matches = []
+
+        for item in visual_matches[:5]:
+
+            match = {
+                "image_url": item.get("thumbnail"),  # gambar kandidat
+                "source_url": item.get("link"),      # sumber halaman
+                "title": item.get("title", "")       # judul (optional)
+            }
+
+            # hanya tambahkan jika image_url ada
+            if match["image_url"]:
+                matches.append(match)
+
+        logger.info(f"Found {len(matches)} candidate images")
+
+        return {
+            "found_on_web": len(matches) > 0,
+            "matches": matches
+        }
+
+    except Exception as e:
+        logger.error(f"Error in web search: {str(e)}")
+
+        return {
+            "found_on_web": False,
+            "matches": []
+        }
+
+    finally:
+        # 4. hapus dari cloudinary (cleanup)
+        delete_image(public_id)
+        logger.info("Temporary image deleted from Cloudinary")

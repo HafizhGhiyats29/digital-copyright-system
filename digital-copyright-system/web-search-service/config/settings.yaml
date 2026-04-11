@@ -1,3 +1,8 @@
 serpapi_key: "bde3a6a4f4c903e219a7107eed5943595c2a31dd72b2e0c67900302a91d54044"
 
+cloudinary:
+  cloud_name: "daz3btopf"
+  api_key: "696374738892441"
+  api_secret: "B8JtgyGy_Rk1pJ1b_6P4TgGvFG8"
+
 request_timeout: 20
