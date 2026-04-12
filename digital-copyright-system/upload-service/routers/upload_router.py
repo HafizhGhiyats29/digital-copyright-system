@@ -4,7 +4,7 @@ from services.web_search_client import send_to_web_search  # import service
 from schemas.response_schema import UploadResponse  # import schema
 from utils.logger import logger  # import logger
 from config.settings import MAX_FILE_SIZE  # import config
-
+from services.feature_client import get_embedding
 import uuid  # library membuat request id
 
 
@@ -40,12 +40,14 @@ async def upload_image(file: UploadFile = File(...)):
 
     logger.info(f"[{request_id}] Image validation passed")
 
-    # kirim ke web search service
-    result = await send_to_web_search(file_bytes)
+    # 1. ambil embedding original
+    original_embedding = await get_embedding(file_bytes)
 
-    logger.info(f"[{request_id}] Web search completed")
+    # 2. kirim ke web search
+    web_result = await send_to_web_search(file_bytes)
 
     return {
         "status": "processed",
-        "web_search_result": result
+        "original_embedding": original_embedding,  # 🔥 TAMBAHAN
+        "web_search_result": web_result
     }

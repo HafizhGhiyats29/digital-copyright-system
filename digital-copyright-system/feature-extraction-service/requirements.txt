@@ -1,8 +1,12 @@
-fastapi  # Web framework untuk membangun API
-uvicorn  # ASGI server untuk menjalankan FastAPI
-torch  # PyTorch untuk model CNN
-torchvision  # Model ResNet dan transformasi gambar
-pillow  # PIL untuk manipulasi gambar
-imagehash  # Library untuk pHash/dHash
-pyyaml  # Bila butuh baca settings.yaml di masa depan
+fastapi
+uvicorn
 python-multipart
+httpx
+pydantic
+pyyaml
+
+torch
+torchvision
+transformers
+pillow
+numpy

@@ -1,7 +1,20 @@
-from pydantic import BaseModel  # library schema validation
+from pydantic import BaseModel
+from typing import List, Optional
 
 
-class UploadResponse(BaseModel):  # schema response upload
+class MatchItem(BaseModel):
+    image_url: str
+    source_url: Optional[str] = None
+    title: Optional[str] = None
+    embedding: List[float]
 
-    status: str  # status proses
-    web_search_result: dict  # hasil dari web search
+
+class WebSearchResult(BaseModel):
+    found_on_web: bool
+    matches: List[MatchItem]
+
+
+class UploadResponse(BaseModel):
+    status: str
+    original_embedding: List[float]
+    web_search_result: WebSearchResult
