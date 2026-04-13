@@ -1,71 +1,80 @@
 import httpx  # untuk HTTP request
+import asyncio  # untuk parallel async
 from config.settings import config  # ambil config
-from services.cloudinary_client import upload_image, delete_image  # upload & delete image
+from services.cloudinary_client import upload_image, delete_image  # cloudinary
 from utils.logger import logger  # logger
-from services.image_downloader import download_image  # download image kandidat
-from services.feature_client import get_embedding  # ambil embedding dari feature service
+from services.image_downloader import download_image  # download gambar
+from services.feature_client import get_embedding  # extract embedding
 
-SERPAPI_KEY = config["serpapi_key"]  # ambil API key
+SERPAPI_KEY = config["serpapi_key"]  # API key
+
+
+async def process_candidate(item):
+    image_url_candidate = item.get("thumbnail")  # ambil thumbnail
+    source_url = item.get("link")  # link sumber
+    title = item.get("title", "")  # judul
+
+    if not image_url_candidate:
+        return None  # skip jika tidak ada URL
+
+    try:
+        image_bytes = await download_image(image_url_candidate)  # download gambar
+        embedding = await get_embedding(image_bytes)  # ambil embedding
+
+        return {
+            "image_url": image_url_candidate,
+            "source_url": source_url,
+            "title": title,
+            "embedding": embedding  # hasil vector
+        }
+
+    except Exception as e:
+        logger.warning(f"Skip candidate {image_url_candidate}: {str(e)}")  # log error
+        return None  # skip jika gagal
 
 
 async def search_image(image_bytes):
 
     # 1. upload ke cloudinary
-    image_url, public_id = upload_image(image_bytes)
-    logger.info(f"Uploaded image to Cloudinary: {image_url}")
+    image_url, public_id = upload_image(image_bytes)  # upload gambar
+    logger.info(f"Uploaded image to Cloudinary: {image_url}")  # log
 
     try:
-        # 2. call serpapi (Google Lens)
+        # 2. request ke SerpAPI (Google Lens)
         params = {
             "engine": "google_lens",
             "url": image_url,
             "api_key": SERPAPI_KEY
         }
 
-        async with httpx.AsyncClient(timeout=60) as client:
+        timeout = httpx.Timeout(60.0)  # timeout aman
 
-            response = await client.get(
+        async with httpx.AsyncClient(timeout=timeout) as client:  # client async
+            response = await client.get(  # request GET
                 "https://serpapi.com/search",
                 params=params
             )
 
-            data = response.json()
-            logger.info("SerpAPI response received")
+            data = response.json()  # ambil JSON
+            logger.info("SerpAPI response received")  # log
 
-        # 3. ambil kandidat + embedding
-        visual_matches = data.get("visual_matches", [])
+        # 3. ambil kandidat gambar
+        visual_matches = data.get("visual_matches", [])  # ambil list
 
-        matches = []
+        # 🔥 batasi kandidat (biar cepat)
+        candidates = visual_matches[:3]  # dari 5 → 3
 
-        for item in visual_matches[:5]:  # limit 5 biar tidak berat
+        # 🔥 PARALLEL PROCESSING
+        tasks = [
+            process_candidate(item) for item in candidates
+        ]  # kumpulkan task
 
-            image_url_candidate = item.get("thumbnail")
-            source_url = item.get("link")
-            title = item.get("title", "")
+        results = await asyncio.gather(*tasks)  # jalankan paralel
 
-            if not image_url_candidate:
-                continue
+        # filter hasil valid
+        matches = [r for r in results if r is not None]
 
-            try:
-                # 🔽 download image kandidat
-                image_bytes_candidate = await download_image(image_url_candidate)
-
-                # 🔽 kirim ke feature extraction service
-                embedding = await get_embedding(image_bytes_candidate)
-
-                match = {
-                    "image_url": image_url_candidate,
-                    "source_url": source_url,
-                    "title": title,
-                    "embedding": embedding  # 🔥 ini kunci untuk similarity
-                }
-
-                matches.append(match)
-
-            except Exception as e:
-                logger.warning(f"Skip candidate {image_url_candidate}: {str(e)}")
-
-        logger.info(f"Processed {len(matches)} candidate images")
+        logger.info(f"Processed {len(matches)} candidate images")  # log
 
         return {
             "found_on_web": len(matches) > 0,
@@ -73,7 +82,7 @@ async def search_image(image_bytes):
         }
 
     except Exception as e:
-        logger.error(f"Error in web search: {str(e)}")
+        logger.error(f"Error in web search: {str(e)}")  # log error
 
         return {
             "found_on_web": False,
@@ -81,6 +90,6 @@ async def search_image(image_bytes):
         }
 
     finally:
-        # 4. hapus dari cloudinary (cleanup)
-        delete_image(public_id)
-        logger.info("Temporary image deleted from Cloudinary")
+        # 4. cleanup cloudinary
+        delete_image(public_id)  # hapus gambar
+        logger.info("Temporary image deleted from Cloudinary")  # log
