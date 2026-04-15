@@ -62,7 +62,7 @@ async def search_image(image_bytes):
         visual_matches = data.get("visual_matches", [])  # ambil list
 
         # 🔥 batasi kandidat (biar cepat)
-        candidates = visual_matches[:3]  # dari 5 → 3
+        candidates = visual_matches[:3]  # 3
 
         # 🔥 PARALLEL PROCESSING
         tasks = [

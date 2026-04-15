@@ -5,6 +5,7 @@ from schemas.response_schema import UploadResponse  # import schema
 from utils.logger import logger  # import logger
 from config.settings import MAX_FILE_SIZE  # import config
 from services.feature_client import get_embedding
+from services.similarity_client import send_to_similarity  # 🔥 TAMBAH INI
 import uuid  # library membuat request id
 
 
@@ -43,11 +44,20 @@ async def upload_image(file: UploadFile = File(...)):
     # 1. ambil embedding original
     original_embedding = await get_embedding(file_bytes)
 
-    # 2. kirim ke web search
+    # 2. web search
     web_result = await send_to_web_search(file_bytes)
 
+    web_matches = web_result.get("matches", [])  # 🔥 penting (list)
+
+    # 3. 🔥 similarity
+    similarity_result = await send_to_similarity(
+        original_embedding,
+        web_matches
+    )
+
     return {
-        "status": "processed",
-        "original_embedding": original_embedding,  # 🔥 TAMBAHAN
-        "web_search_result": web_result
+    "status": "processed",
+    "original_embedding": original_embedding,
+    "web_search_result": web_result,
+    "similarity_result": similarity_result  # 🔥 TAMBAH INI
     }

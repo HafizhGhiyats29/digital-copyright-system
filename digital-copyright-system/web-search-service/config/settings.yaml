@@ -5,6 +5,6 @@ cloudinary:
   api_key: "696374738892441"
   api_secret: "B8JtgyGy_Rk1pJ1b_6P4TgGvFG8"
 
-feature_service_url: "http://localhost:8003/extract"
+feature_service_url: "http://localhost:8002/extract"
 
 request_timeout: 20

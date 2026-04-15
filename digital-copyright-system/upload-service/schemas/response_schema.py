@@ -18,3 +18,4 @@ class UploadResponse(BaseModel):
     status: str
     original_embedding: List[float]
     web_search_result: WebSearchResult
+    similarity_result: Optional[dict] = None
