@@ -1,19 +1,23 @@
-import httpx  # HTTP client
-from config.settings import config  # config
-
-SIMILARITY_SERVICE_URL = config["similarity_service_url"]  # ambil URL
+import httpx  # Import HTTP client async
+from config.settings import config  # Import config
 
 
-async def send_to_similarity(query_embedding, web_matches):
+SIMILARITY_SERVICE_URL = config["similarity_service_url"]  # Ambil URL similarity-service dari config
 
-    async with httpx.AsyncClient() as client:  # buat client
 
-        response = await client.post(
-            SIMILARITY_SERVICE_URL,  # endpoint similarity
-            json={
-                "embedding": query_embedding,   # embedding user
-                "web_matches": web_matches      # hasil dari web search
-            }
-        )
+async def send_to_similarity(query_clip_embedding, query_cnn_embedding, web_matches):  # Fungsi kirim data ke similarity
+    timeout = httpx.Timeout(60.0)  # Timeout request ke similarity-service
 
-        return response.json()  # return hasil similarity
+    async with httpx.AsyncClient(timeout=timeout) as client:  # Membuat HTTP client
+        response = await client.post(  # Mengirim POST request
+            SIMILARITY_SERVICE_URL,  # Endpoint similarity-service
+            json={  # Body JSON request
+                "clip_embedding": query_clip_embedding,  # Embedding CLIP gambar original
+                "cnn_embedding": query_cnn_embedding,  # Embedding CNN gambar original
+                "web_matches": web_matches  # Kandidat dari web-search-service
+            }  # Menutup JSON body
+        )  # Menutup request POST
+
+        response.raise_for_status()  # Lempar error jika response bukan 2xx
+
+        return response.json()  # Return hasil similarity

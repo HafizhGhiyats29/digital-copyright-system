@@ -1,95 +1,94 @@
-import httpx  # untuk HTTP request
-import asyncio  # untuk parallel async
-from config.settings import config  # ambil config
-from services.cloudinary_client import upload_image, delete_image  # cloudinary
-from utils.logger import logger  # logger
-from services.image_downloader import download_image  # download gambar
-from services.feature_client import get_embedding  # extract embedding
+import httpx  # Library untuk HTTP request async
+import asyncio  # Library untuk menjalankan task async secara paralel
+from config.settings import config  # Import konfigurasi aplikasi
+from services.cloudinary_client import upload_image, delete_image  # Import fungsi upload dan delete Cloudinary
+from utils.logger import logger  # Import logger untuk logging
+from services.image_downloader import download_image  # Import fungsi download gambar kandidat
+from services.feature_client import get_embedding  # Import client untuk feature extraction service
 
-SERPAPI_KEY = config["serpapi_key"]  # API key
-
-
-async def process_candidate(item):
-    image_url_candidate = item.get("thumbnail")  # ambil thumbnail
-    source_url = item.get("link")  # link sumber
-    title = item.get("title", "")  # judul
-
-    if not image_url_candidate:
-        return None  # skip jika tidak ada URL
-
-    try:
-        image_bytes = await download_image(image_url_candidate)  # download gambar
-        embedding = await get_embedding(image_bytes)  # ambil embedding
-
-        return {
-            "image_url": image_url_candidate,
-            "source_url": source_url,
-            "title": title,
-            "embedding": embedding  # hasil vector
-        }
-
-    except Exception as e:
-        logger.warning(f"Skip candidate {image_url_candidate}: {str(e)}")  # log error
-        return None  # skip jika gagal
+SERPAPI_KEY = config["serpapi_key"]  # Mengambil API key SerpAPI dari config
 
 
-async def search_image(image_bytes):
+async def process_candidate(item):  # Fungsi untuk memproses satu kandidat gambar dari SerpAPI
+    image_url_candidate = item.get("thumbnail")  # Mengambil URL thumbnail kandidat
+    source_url = item.get("link")  # Mengambil URL sumber kandidat
+    title = item.get("title", "")  # Mengambil judul kandidat
 
-    # 1. upload ke cloudinary
-    image_url, public_id = upload_image(image_bytes)  # upload gambar
-    logger.info(f"Uploaded image to Cloudinary: {image_url}")  # log
+    if not image_url_candidate:  # Mengecek apakah thumbnail kosong
+        return None  # Skip kandidat jika tidak punya gambar
 
-    try:
-        # 2. request ke SerpAPI (Google Lens)
-        params = {
-            "engine": "google_lens",
-            "url": image_url,
-            "api_key": SERPAPI_KEY
-        }
+    try:  # Memulai error handling kandidat
+        image_bytes = await download_image(image_url_candidate)  # Download gambar kandidat menjadi bytes
+        embedding_result = await get_embedding(image_bytes)  # Ambil CLIP + CNN embedding dari feature service
 
-        timeout = httpx.Timeout(60.0)  # timeout aman
+        clip_embedding = embedding_result.get("clip_embedding")  # Ambil embedding CLIP dari hasil feature service
+        cnn_embedding = embedding_result.get("cnn_embedding")  # Ambil embedding CNN dari hasil feature service
 
-        async with httpx.AsyncClient(timeout=timeout) as client:  # client async
-            response = await client.get(  # request GET
-                "https://serpapi.com/search",
-                params=params
-            )
+        if not clip_embedding or not cnn_embedding:  # Validasi embedding tidak boleh kosong
+            logger.warning(f"Skip candidate {image_url_candidate}: embedding tidak lengkap")  # Log jika embedding kosong
+            return None  # Skip kandidat jika embedding tidak lengkap
 
-            data = response.json()  # ambil JSON
-            logger.info("SerpAPI response received")  # log
+        return {  # Mengembalikan data kandidat yang valid
+            "image_url": image_url_candidate,  # URL gambar kandidat
+            "source_url": source_url,  # URL sumber kandidat
+            "title": title,  # Judul kandidat
+            "clip_embedding": clip_embedding,  # Embedding CLIP kandidat
+            "cnn_embedding": cnn_embedding  # Embedding CNN kandidat
+        }  # Menutup dictionary kandidat
 
-        # 3. ambil kandidat gambar
-        visual_matches = data.get("visual_matches", [])  # ambil list
+    except Exception as e:  # Menangkap error pada kandidat tertentu
+        logger.warning(f"Skip candidate {image_url_candidate}: {str(e)}")  # Log kandidat yang gagal
+        return None  # Skip kandidat yang gagal
 
-        # 🔥 batasi kandidat (biar cepat)
-        candidates = visual_matches[:3]  # 3
 
-        # 🔥 PARALLEL PROCESSING
-        tasks = [
-            process_candidate(item) for item in candidates
-        ]  # kumpulkan task
+async def search_image(image_bytes):  # Fungsi utama web search gambar
+    image_url, public_id = upload_image(image_bytes)  # Upload gambar input ke Cloudinary
+    logger.info(f"Uploaded image to Cloudinary: {image_url}")  # Log URL Cloudinary
 
-        results = await asyncio.gather(*tasks)  # jalankan paralel
+    try:  # Memulai blok utama web search
+        params = {  # Parameter untuk request SerpAPI Google Lens
+            "engine": "google_lens",  # Engine yang digunakan adalah Google Lens
+            "url": image_url,  # URL gambar dari Cloudinary
+            "api_key": SERPAPI_KEY  # API key SerpAPI
+        }  # Menutup dictionary params
 
-        # filter hasil valid
-        matches = [r for r in results if r is not None]
+        timeout = httpx.Timeout(60.0)  # Timeout request ke SerpAPI
 
-        logger.info(f"Processed {len(matches)} candidate images")  # log
+        async with httpx.AsyncClient(timeout=timeout) as client:  # Membuat HTTP client async
+            response = await client.get(  # Mengirim request GET ke SerpAPI
+                "https://serpapi.com/search",  # Endpoint SerpAPI
+                params=params  # Parameter request
+            )  # Menutup request GET
 
-        return {
-            "found_on_web": len(matches) > 0,
-            "matches": matches
-        }
+            response.raise_for_status()  # Lempar error jika status bukan 2xx
+            data = response.json()  # Mengubah response menjadi JSON
+            logger.info("SerpAPI response received")  # Log response diterima
 
-    except Exception as e:
-        logger.error(f"Error in web search: {str(e)}")  # log error
+        visual_matches = data.get("visual_matches", [])  # Mengambil daftar visual matches dari SerpAPI
 
-        return {
-            "found_on_web": False,
-            "matches": []
-        }
+        candidates = visual_matches[:3]  # Membatasi kandidat agar proses tidak terlalu lama
 
-    finally:
-        # 4. cleanup cloudinary
-        delete_image(public_id)  # hapus gambar
-        logger.info("Temporary image deleted from Cloudinary")  # log
+        tasks = [process_candidate(item) for item in candidates]  # Membuat task async untuk setiap kandidat
+
+        results = await asyncio.gather(*tasks)  # Menjalankan semua kandidat secara paralel
+
+        matches = [result for result in results if result is not None]  # Filter kandidat yang berhasil diproses
+
+        logger.info(f"Processed {len(matches)} candidate images")  # Log jumlah kandidat berhasil
+
+        return {  # Mengembalikan hasil akhir web search
+            "found_on_web": len(matches) > 0,  # True jika ada kandidat berhasil
+            "matches": matches  # List kandidat beserta CLIP + CNN embedding
+        }  # Menutup dictionary response
+
+    except Exception as e:  # Menangkap error umum web search
+        logger.error(f"Error in web search: {str(e)}")  # Log error
+
+        return {  # Mengembalikan response aman saat gagal
+            "found_on_web": False,  # Tidak ditemukan karena proses gagal
+            "matches": []  # List kosong
+        }  # Menutup dictionary response
+
+    finally:  # Blok cleanup selalu jalan
+        delete_image(public_id)  # Menghapus gambar temporary dari Cloudinary
+        logger.info("Temporary image deleted from Cloudinary")  # Log cleanup

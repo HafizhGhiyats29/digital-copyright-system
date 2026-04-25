@@ -1,19 +1,20 @@
-from fastapi import APIRouter  # router
-from models.response_schema import SimilarityRequest  # schema
-from services.similarity_service import compute_similarity  # service
-
-router = APIRouter()
+from fastapi import APIRouter  # Import router FastAPI
+from schemas.response_schema import SimilarityRequest  # Import schema request
+from services.similarity_service import compute_similarity  # Import service similarity
 
 
-@router.post("/similarity")
-async def similarity_check(request: SimilarityRequest):
+router = APIRouter()  # Membuat router FastAPI
 
-    results = await compute_similarity(
-        request.embedding,
-        request.web_matches
-    )
 
-    return {
-        "total": len(results),
-        "results": results
-    }
+@router.post("/similarity")  # Endpoint similarity check
+async def similarity_check(request: SimilarityRequest):  # Fungsi menerima request similarity
+    results = await compute_similarity(  # Jalankan similarity service
+        request.clip_embedding,  # Embedding CLIP original
+        request.cnn_embedding,  # Embedding CNN original
+        request.web_matches  # Kandidat dari web-search
+    )  # Menutup pemanggilan compute_similarity
+
+    return {  # Return response API
+        "total": len(results),  # Jumlah hasil similarity
+        "results": results  # List hasil similarity
+    }  # Menutup dictionary

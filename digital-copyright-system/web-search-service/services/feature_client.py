@@ -1,19 +1,27 @@
-import httpx  # HTTP client
-from config.settings import config  # ambil config
+import httpx  # Library HTTP async
+from config.settings import config  # Import konfigurasi
+from utils.logger import logger  # Import logger
 
-FEATURE_SERVICE_URL = config["feature_service_url"]
+FEATURE_SERVICE_URL = config["feature_service_url"]  # URL feature extraction service
 
-async def get_embedding(image_bytes):
 
-    async with httpx.AsyncClient() as client:
+async def get_embedding(image_bytes):  # Fungsi untuk meminta embedding ke feature service
+    timeout = httpx.Timeout(60.0)  # Timeout request ke feature service
 
-        files = {
-            "image": ("image.jpg", image_bytes, "image/jpeg")
-        }
+    files = {  # File multipart untuk dikirim ke feature service
+        "file": ("candidate.jpg", image_bytes, "image/jpeg")  # Field harus sesuai endpoint feature: file
+    }  # Menutup dictionary files
 
-        response = await client.post(
-            FEATURE_SERVICE_URL,
-            files=files
-        )
+    async with httpx.AsyncClient(timeout=timeout) as client:  # Membuat HTTP client async
+        response = await client.post(  # Request POST ke feature extraction
+            FEATURE_SERVICE_URL,  # URL endpoint /extract
+            files=files  # File yang dikirim
+        )  # Menutup request POST
 
-        return response.json()["embedding"]
+        response.raise_for_status()  # Lempar error jika status bukan 2xx
+
+        result = response.json()  # Ambil response JSON
+
+        logger.info("Feature embedding received from feature-service")  # Log sukses
+
+        return result  # Return seluruh response: status, clip_embedding, cnn_embedding

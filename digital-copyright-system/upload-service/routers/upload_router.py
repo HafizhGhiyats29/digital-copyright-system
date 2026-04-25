@@ -1,63 +1,58 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException  # import fastapi
-from utils.image_validator import validate_image  # import validator
-from services.web_search_client import send_to_web_search  # import service
-from schemas.response_schema import UploadResponse  # import schema
-from utils.logger import logger  # import logger
-from config.settings import MAX_FILE_SIZE  # import config
-from services.feature_client import get_embedding
-from services.similarity_client import send_to_similarity  # 🔥 TAMBAH INI
-import uuid  # library membuat request id
+from fastapi import APIRouter, UploadFile, File, HTTPException  # Import komponen FastAPI
+from utils.image_validator import validate_image  # Import validator gambar
+from services.web_search_client import send_to_web_search  # Import client web search
+from schemas.response_schema import UploadResponse  # Import schema response
+from utils.logger import logger  # Import logger
+from config.settings import MAX_FILE_SIZE  # Import batas ukuran file
+from services.feature_client import get_embedding  # Import client feature extraction
+from services.similarity_client import send_to_similarity  # Import client similarity service
+import uuid  # Import uuid untuk membuat request id unik
 
 
-router = APIRouter()  # membuat router
+router = APIRouter()  # Membuat router FastAPI
 
 
-@router.post("/upload", response_model=UploadResponse)
-async def upload_image(file: UploadFile = File(...)):
+@router.post("/upload", response_model=UploadResponse)  # Endpoint upload gambar
+async def upload_image(file: UploadFile = File(...)):  # Fungsi menerima file dari user
+    request_id = str(uuid.uuid4())  # Membuat request id unik
 
-    # membuat request id
-    request_id = str(uuid.uuid4())
+    logger.info(f"[{request_id}] Upload request received")  # Log request diterima
 
-    logger.info(f"[{request_id}] Upload request received")
+    if file.content_type not in ["image/jpeg", "image/png", "image/webp"]:  # Validasi tipe file
+        logger.warning(f"[{request_id}] Unsupported file type: {file.content_type}")  # Log tipe file salah
+        raise HTTPException(status_code=400, detail="Format gambar tidak didukung")  # Return error format
 
-    # validasi tipe file
-    if file.content_type not in ["image/jpeg", "image/png", "image/webp"]:
-        logger.warning(f"[{request_id}] Unsupported file type: {file.content_type}")
-        raise HTTPException(status_code=400, detail="Format gambar tidak didukung")
+    file_bytes = await file.read()  # Membaca file menjadi bytes
 
-    # membaca file ke RAM
-    file_bytes = await file.read()
+    logger.info(f"[{request_id}] File name: {file.filename}")  # Log nama file
+    logger.info(f"[{request_id}] File size: {len(file_bytes)} bytes")  # Log ukuran file
 
-    logger.info(f"[{request_id}] File name: {file.filename}")
-    logger.info(f"[{request_id}] File size: {len(file_bytes)} bytes")
+    if len(file_bytes) > MAX_FILE_SIZE:  # Mengecek apakah file terlalu besar
+        logger.warning(f"[{request_id}] File too large")  # Log file terlalu besar
+        raise HTTPException(status_code=400, detail="File terlalu besar")  # Return error ukuran file
 
-    # cek ukuran file
-    if len(file_bytes) > MAX_FILE_SIZE:
-        logger.warning(f"[{request_id}] File too large")
-        raise HTTPException(status_code=400, detail="File terlalu besar")
+    validate_image(file_bytes)  # Validasi isi file benar-benar gambar
 
-    # validasi gambar
-    validate_image(file_bytes)
+    logger.info(f"[{request_id}] Image validation passed")  # Log validasi berhasil
 
-    logger.info(f"[{request_id}] Image validation passed")
+    original_feature = await get_embedding(file_bytes)  # Ambil CLIP + CNN embedding dari gambar original
 
-    # 1. ambil embedding original
-    original_embedding = await get_embedding(file_bytes)
+    original_clip_embedding = original_feature["clip_embedding"]  # Ambil embedding CLIP original
+    original_cnn_embedding = original_feature["cnn_embedding"]  # Ambil embedding CNN original
 
-    # 2. web search
-    web_result = await send_to_web_search(file_bytes)
+    web_result = await send_to_web_search(file_bytes)  # Kirim gambar ke web-search-service
 
-    web_matches = web_result.get("matches", [])  # 🔥 penting (list)
+    web_matches = web_result.get("matches", [])  # Ambil list kandidat dari web search
 
-    # 3. 🔥 similarity
-    similarity_result = await send_to_similarity(
-        original_embedding,
-        web_matches
-    )
+    similarity_result = await send_to_similarity(  # Kirim data ke similarity-service
+        original_clip_embedding,  # Embedding CLIP original
+        original_cnn_embedding,  # Embedding CNN original
+        web_matches  # Kandidat web yang sudah punya CLIP + CNN embedding
+    )  # Menutup pemanggilan similarity
 
-    return {
-    "status": "processed",
-    "original_embedding": original_embedding,
-    "web_search_result": web_result,
-    "similarity_result": similarity_result  # 🔥 TAMBAH INI
-    }
+    return {  # Return response ke user
+        "status": "processed",  # Status proses
+        "original_feature": original_feature,  # Embedding original CLIP + CNN
+        "web_search_result": web_result,  # Hasil web search
+        "similarity_result": similarity_result  # Hasil similarity
+    }  # Menutup dictionary response

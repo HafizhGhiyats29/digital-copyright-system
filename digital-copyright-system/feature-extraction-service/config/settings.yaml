@@ -1,0 +1,4 @@
+clip_model_name: "openai/clip-vit-base-patch32"
+cnn_model_name: "resnet50"
+device: "cuda"
+image_size: 224
