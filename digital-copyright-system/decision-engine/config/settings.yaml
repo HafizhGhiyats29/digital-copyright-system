@@ -1,0 +1,26 @@
+default_preset: "strict"
+
+default_thresholds:
+  high: 0.90
+  medium: 0.75
+  low: 0.60
+
+presets:
+  strict:
+    high: 0.90
+    medium: 0.75
+    low: 0.60
+
+  balanced:
+    high: 0.85
+    medium: 0.70
+    low: 0.55
+
+  sensitive:
+    high: 0.80
+    medium: 0.65
+    low: 0.50
+
+min_allowed_threshold: 0.30
+max_allowed_threshold: 0.98
+round_decimals: 4

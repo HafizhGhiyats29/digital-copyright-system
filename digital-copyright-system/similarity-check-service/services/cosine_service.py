@@ -1,4 +1,6 @@
-import numpy as np  # Library untuk operasi vector
+import numpy as np 
+from config.settings import settings  # Import konfigurasi YAML
+ # Library untuk operasi vector
 
 
 def cosine_similarity(vec1, vec2):  # Fungsi menghitung cosine similarity dua vector
@@ -23,8 +25,8 @@ def cosine_similarity(vec1, vec2):  # Fungsi menghitung cosine similarity dua ve
 def compute_external_similarity(query_clip_embedding, query_cnn_embedding, matches):  # Hitung similarity eksternal
     results = []  # Menampung semua hasil similarity
 
-    clip_weight = 0.4  # Bobot CLIP untuk makna/semantic visual
-    cnn_weight = 0.6  # Bobot CNN untuk detail visual gambar
+    clip_weight = settings["clip_weight"]  # Bobot CLIP untuk makna/semantic visual
+    cnn_weight = settings["cnn_weight"]  # Bobot CNN untuk detail visual gambar
 
     for match in matches:  # Loop semua kandidat hasil web-search
         match_data = match.model_dump() if hasattr(match, "model_dump") else match  # Ubah Pydantic object ke dict jika perlu

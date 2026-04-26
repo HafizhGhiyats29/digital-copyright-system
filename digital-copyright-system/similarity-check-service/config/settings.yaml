@@ -1,0 +1,17 @@
+milvus_host: "localhost"
+milvus_port: "19530"
+milvus_collection_name: "internal_image_embeddings"
+
+clip_vector_field: "clip_embedding"
+cnn_vector_field: "cnn_embedding"
+
+clip_weight: 0.4
+cnn_weight: 0.6
+
+top_k_internal: 5
+top_k_external: 5
+
+milvus_search_metric: "COSINE"
+
+feature_service_url: "http://localhost:8002/extract"
+internal_images_dir: "../database/internal_images"
