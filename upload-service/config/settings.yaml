@@ -1,0 +1,7 @@
+feature_service_url: "http://localhost:8002/extract"
+web_search_service_url: "http://localhost:8001/search"
+similarity_service_url: "http://localhost:8003/similarity"
+
+max_file_size: 5242880   # 5MB
+
+request_timeout: 20
