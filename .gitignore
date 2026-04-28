@@ -11,7 +11,7 @@ env/
 venv/
 ENV/
 .venv/
-database/milvus/volumes/
+database/
 
 # === IDE / Editor ===
 .vscode/
@@ -46,3 +46,4 @@ pip-wheel-metadata/
 # === Other Temp Files ===
 *.tmp
 *.temp
+database/milvus/volumes/
