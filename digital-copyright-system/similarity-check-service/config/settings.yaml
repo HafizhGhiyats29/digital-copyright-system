@@ -8,8 +8,8 @@ cnn_vector_field: "cnn_embedding"
 clip_weight: 0.4
 cnn_weight: 0.6
 
-top_k_internal: 5
-top_k_external: 5
+top_k_internal: 3
+top_k_external: 3
 
 milvus_search_metric: "COSINE"
 

@@ -4,6 +4,13 @@ from pymilvus import FieldSchema  # Import schema field Milvus
 from pymilvus import CollectionSchema  # Import schema collection Milvus
 from pymilvus import DataType  # Import tipe data Milvus
 from pymilvus import Collection  # Import Collection Milvus
+
+
+import sys  # Mengakses konfigurasi path Python
+from pathlib import Path  # Mengatur path folder dan file
+
+ROOT_DIR = Path(__file__).resolve().parents[1]  # Mengambil root similarity-check-service
+sys.path.insert(0, str(ROOT_DIR))  # Menambahkan root service ke Python path
 from config.settings import settings  # Import settings dari file config
 
 
