@@ -1,0 +1,19 @@
+image_a,image_b,label
+same/chisa_original.png,same/chisa_original copy.png,plagiarized
+same/chisa_original.png,same/chisa_resize.png,plagiarized
+same/chisa_original.png,same/chisa_compress.png,plagiarized
+same/chisa_original.png,modified/chisa_blur.png,plagiarized
+same/chisa_original.png,modified/chisa_brightness.png,plagiarized
+same/chisa_original.png,modified/chisa_contrast.png,plagiarized
+same/chisa_original.png,modified/chisa_crop.png,plagiarized
+same/chisa_original.png,modified/chisa_rotate.png,plagiarized
+same/chisa_original.png,modified/chisa_watermark.png,plagiarized
+same/chisa_original.png,different/Chisa.png,plagiarized
+same/chisa_original.png,different/Okuri.png,not_plagiarized
+same/chisa_original.png,different/sample 2.jpg,not_plagiarized
+same/chisa_original.png,different/wikabichan-lily.jpg,not_plagiarized
+different/Okuri.png,different/sample 2.jpg,not_plagiarized
+different/Okuri.png,different/wikabichan-lily.jpg,not_plagiarized
+different/sample 2.jpg,different/wikabichan-lily.jpg,not_plagiarized
+semantic_similar/tree_digital_1.jpg,semantic_similar/tree_digital_2.jpg,semantic_only
+semantic_similar/beach_different_design.jpg,semantic_similar/beach_other_design.jpg,semantic_only

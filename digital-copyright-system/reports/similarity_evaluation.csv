@@ -1,0 +1,29 @@
+image_a,image_b,label,clip_score,cnn_score,final_score,prediction,correct
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_original.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_original copy.png,plagiarized,1.000000,1.000000,1.000000,plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_original.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_resize.png,plagiarized,0.997189,0.999711,0.998702,plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_original.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_compress.png,plagiarized,0.993336,0.996656,0.995328,plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_original.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\modified\chisa_blur.png,plagiarized,0.964135,0.915335,0.934855,plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_original.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\modified\chisa_brightness.png,plagiarized,0.968471,0.937611,0.949955,plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_original.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\modified\chisa_contrast.png,plagiarized,0.970772,0.890173,0.922412,plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_original.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\modified\chisa_crop.png,plagiarized,0.932436,0.884884,0.903905,plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_original.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\modified\chisa_rotate.png,plagiarized,0.939581,0.890530,0.910150,plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_original.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\modified\chisa_watermark.png,plagiarized,0.933999,0.905520,0.916912,plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_original.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\different\Chisa.png,plagiarized,1.000000,1.000000,1.000000,plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_original.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\different\Okuri.png,not_plagiarized,0.683123,0.185159,0.384344,not_plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_original.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\different\sample 2.jpg,not_plagiarized,0.485670,0.146549,0.282198,not_plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\same\chisa_original.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\different\wikabichan-lily.jpg,not_plagiarized,0.665742,0.278590,0.433451,not_plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\different\Okuri.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\different\sample 2.jpg,not_plagiarized,0.548643,0.381244,0.448204,not_plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\different\Okuri.png,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\different\wikabichan-lily.jpg,not_plagiarized,0.733656,0.307355,0.477876,not_plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\different\sample 2.jpg,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\different\wikabichan-lily.jpg,not_plagiarized,0.464688,0.228087,0.322727,not_plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\semantic_similar\tree_digital_1.jpg,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\semantic_similar\tree_digital_2.jpg,not_plagiarized,0.955621,0.781198,0.850967,not_plagiarized,True
+E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\semantic_similar\beach_different_design.jpg,E:\Hafizh Code\Capstone2\digital-copyright-system\evaluation_dataset\semantic_similar\beach_other_design.jpg,not_plagiarized,0.941774,0.913149,0.924599,plagiarized,False
+,,,,,,,
+metrics,,,,,,,
+total,18.000000,,,,,,
+accuracy,0.944444,,,,,,
+precision,0.909091,,,,,,
+recall,1.000000,,,,,,
+f1,0.952381,,,,,,
+true_positive,10.000000,,,,,,
+false_positive,1.000000,,,,,,
+false_negative,0.000000,,,,,,
