@@ -39,8 +39,6 @@ def create(data: dict):
 # ======================
 # READ
 # ======================
-import math
-
 @app.get("/metadata")
 def read():
     data = get_all_metadata()
@@ -48,12 +46,6 @@ def read():
 
     for d in data:
         d["_id"] = str(d["_id"])
-
-        # 🔥 HANDLE NaN
-        for k, v in d.items():
-            if isinstance(v, float) and math.isnan(v):
-                d[k] = None
-
         result.append(d)
 
     return result

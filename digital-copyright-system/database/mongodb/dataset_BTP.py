@@ -11,7 +11,7 @@ df = pd.read_excel("Dataset BTP.xlsx")
 df = df.dropna(how="all")
 
 # hapus kolom yang gak dipakai
-df = df.drop(columns=["Link Contoh Ciptaan", "Contoh Ciptaan"], errors="ignore")
+df = df.drop(columns=["ki_id", "Link Contoh Ciptaan", "Contoh Ciptaan"], errors="ignore")
 
 print("Jumlah data:", len(df))
 print("Kolom:", df.columns)
