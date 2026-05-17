@@ -209,9 +209,9 @@ async def main() -> None:
     parser.add_argument("--output", default=Path("reports/similarity_evaluation.csv"), type=Path)
     parser.add_argument("--clip-weight", default=0.4, type=float)
     parser.add_argument("--cnn-weight", default=0.6, type=float)
-    parser.add_argument("--clip-threshold", default=0.92, type=float)
-    parser.add_argument("--cnn-threshold", default=0.80, type=float)
-    parser.add_argument("--final-threshold", default=0.88, type=float)
+    parser.add_argument("--clip-threshold", default=0.88, type=float)
+    parser.add_argument("--cnn-threshold", default=0.75, type=float)
+    parser.add_argument("--final-threshold", default=0.82, type=float)
     args = parser.parse_args()
 
     rows = list(read_pairs(args.pairs))
@@ -244,6 +244,9 @@ async def main() -> None:
     print(f"Precision: {metrics['precision']:.4f}")
     print(f"Recall: {metrics['recall']:.4f}")
     print(f"F1: {metrics['f1']:.4f}")
+    print(f"True Positives: {int(metrics['true_positive'])}")
+    print(f"False Positives: {int(metrics['false_positive'])}")
+    print(f"False Negatives: {int(metrics['false_negative'])}")
     print(f"Saved: {args.output}")
 
 
