@@ -28,6 +28,8 @@ Thumbs.db
 *.egg-info/
 .eggs/
 .cache/
+.pytest_cache/
+.pytest_tmp/
 
 # === Jupyter Notebook Checkpoints ===
 .ipynb_checkpoints/
