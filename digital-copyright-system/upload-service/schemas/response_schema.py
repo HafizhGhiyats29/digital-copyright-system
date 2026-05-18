@@ -27,6 +27,10 @@ class WebSearchResult(BaseModel):  # Schema hasil web search
 
 class UploadResponse(BaseModel):  # Schema response akhir upload-service
     status: str  # Status proses upload
+    check_id: Optional[str] = None  # ID hasil pengecekan untuk reuse embedding sementara saat registrasi
+    can_register: bool = False  # Apakah gambar boleh dilanjutkan ke registrasi metadata
+    registration_status: str = "blocked"  # Status registrasi: allowed, review_required, atau blocked
+    registration_reason: Optional[str] = None  # Alasan boleh/tidaknya registrasi
     original_feature: Optional[FeatureResult] = None  # Hasil feature extraction original tanpa embedding
     web_search_result: WebSearchResult  # Hasil web search tanpa embedding kandidat
     similarity_result: Optional[Dict[str, Any]] = None  # Hasil similarity-service

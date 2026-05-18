@@ -1,4 +1,5 @@
 from services.cosine_service import compute_external_similarity  # Mengimpor fungsi similarity eksternal berbasis cosine
+from services.metadata_client import enrich_internal_results  # Mengambil detail metadata untuk hasil internal
 from services.milvus_client import search_internal_similarity  # Mengimpor fungsi similarity internal berbasis Milvus
 from config.settings import settings  # Mengimpor konfigurasi dari settings.yaml
 
@@ -83,6 +84,8 @@ async def compute_similarity(query_clip_embedding, query_cnn_embedding, web_matc
         query_cnn_embedding=query_cnn_embedding,  # Embedding CNN gambar input
         top_k=settings.get("top_k_internal", 10)  # Jumlah kandidat internal yang diambil
     )  # Menutup pemanggilan Milvus
+
+    internal_results = await enrich_internal_results(internal_results)  # Tambahkan detail metadata dan saring data belum ready
 
     external_results = compute_external_similarity(  # Menghitung similarity eksternal menggunakan cosine manual
         query_clip_embedding,  # Embedding CLIP gambar input

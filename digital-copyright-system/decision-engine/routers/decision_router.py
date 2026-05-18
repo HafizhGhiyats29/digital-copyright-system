@@ -10,10 +10,15 @@ router = APIRouter()  # Membuat router FastAPI
 @router.post("/decision", response_model=DecisionResponse)  # Endpoint decision-engine
 async def create_decision(request: DecisionRequest):  # Fungsi menerima request decision
     try:  # Memulai error handling
-        logger.info(f"Decision request received with score: {request.overall_score}")  # Log score yang diterima
+        logger.info(  # Log score yang diterima
+            f"Decision request received with overall={request.overall_score}, "
+            f"clip={request.clip_score}, cnn={request.cnn_score}"
+        )  # Menutup logger
 
         result = build_decision(  # Membuat decision berdasarkan score dan threshold
             overall_score=request.overall_score,  # Mengirim overall_score
+            clip_score=request.clip_score,  # Mengirim clip_score kandidat terbaik
+            cnn_score=request.cnn_score,  # Mengirim cnn_score kandidat terbaik
             preset=request.preset,  # Mengirim preset dari user
             custom_thresholds=request.thresholds  # Mengirim custom threshold dari user
         )  # Menutup pemanggilan build_decision

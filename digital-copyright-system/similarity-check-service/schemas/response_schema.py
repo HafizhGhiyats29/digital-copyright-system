@@ -14,3 +14,10 @@ class SimilarityRequest(BaseModel):  # Schema request similarity-service
     clip_embedding: List[float]  # Embedding CLIP gambar original
     cnn_embedding: List[float]  # Embedding CNN gambar original
     web_matches: List[WebMatchItem]  # List kandidat gambar dari web-search-service
+
+
+class EmbeddingInsertRequest(BaseModel):
+    metadata_id: str
+    clip_embedding: List[float]
+    cnn_embedding: List[float]
+    embedding_version: str = "clip-cnn-v1"

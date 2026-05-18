@@ -5,6 +5,14 @@ default_thresholds:
   medium: 0.75
   low: 0.60
 
+score_rules:
+  clip_high: 0.88
+  cnn_high: 0.75
+  final_high: 0.82
+  possible_final: 0.65
+  possible_clip: 0.80
+  possible_cnn: 0.60
+
 presets:
   strict:
     high: 0.90

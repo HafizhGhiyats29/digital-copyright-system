@@ -1,0 +1,11 @@
+app_name: "Copyright Metadata Service"
+app_version: "1.0.0"
+
+storage:
+  type: "mongodb"
+  path: "data/metadata.json"
+
+mongodb:
+  uri: "mongodb://localhost:27017"
+  database: "digital_copyright"
+  collection: "copyright_metadata"

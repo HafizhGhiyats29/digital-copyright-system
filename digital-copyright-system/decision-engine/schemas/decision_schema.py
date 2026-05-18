@@ -10,6 +10,8 @@ class ThresholdConfig(BaseModel):  # Schema custom threshold dari user
 
 class DecisionRequest(BaseModel):  # Schema request ke decision-engine
     overall_score: float = Field(..., ge=0.0, le=1.0)  # Score utama dari similarity-service
+    clip_score: Optional[float] = Field(None, ge=0.0, le=1.0)  # Score CLIP kandidat terbaik
+    cnn_score: Optional[float] = Field(None, ge=0.0, le=1.0)  # Score CNN kandidat terbaik
     preset: Optional[str] = None  # Preset threshold, contoh strict/balanced/sensitive
     thresholds: Optional[ThresholdConfig] = None  # Custom threshold dari user
 
@@ -23,4 +25,6 @@ class DecisionDetail(BaseModel):  # Schema detail keputusan
 
 class DecisionResponse(BaseModel):  # Schema response decision-engine
     overall_score: float  # Score utama yang sudah diproses
+    clip_score: Optional[float] = None  # Score CLIP kandidat terbaik jika tersedia
+    cnn_score: Optional[float] = None  # Score CNN kandidat terbaik jika tersedia
     decision: DecisionDetail  # Detail keputusan

@@ -52,7 +52,41 @@ def get_thresholds(preset=None, custom_thresholds=None):  # Fungsi memilih thres
     return thresholds, threshold_source  # Return threshold dan sumbernyangembalikan threshold dan sumbernya
 
 
-def build_decision(overall_score, preset=None, custom_thresholds=None):  # Fungsi utama membuat keputusan
+def get_score_rules():  # Mengambil rule tambahan untuk CLIP/CNN dari config
+    rules = settings.get("score_rules", {})  # Ambil rule jika tersedia
+
+    return {  # Return rule dengan fallback aman
+        "clip_high": float(rules.get("clip_high", 0.88)),  # Batas CLIP untuk plagiarized kuat
+        "cnn_high": float(rules.get("cnn_high", 0.75)),  # Batas CNN untuk plagiarized kuat
+        "final_high": float(rules.get("final_high", 0.82)),  # Batas final score dengan CNN kuat
+        "possible_final": float(rules.get("possible_final", 0.65)),  # Batas possible dari final score
+        "possible_clip": float(rules.get("possible_clip", 0.80)),  # Batas possible dari CLIP
+        "possible_cnn": float(rules.get("possible_cnn", 0.60)),  # Batas possible dari CNN
+    }  # Menutup dictionary rule
+
+
+def round_optional_score(score, round_decimals):  # Membulatkan score opsional
+    if score is None:  # Jika score tidak dikirim
+        return None  # Biarkan kosong
+
+    return round(float(score), round_decimals)  # Bulatkan score
+
+
+def build_response(score, clip_score, cnn_score, status, risk_level, requires_review, reason):  # Helper response
+    return {  # Mengembalikan format response decision
+        "overall_score": score,  # Score utama
+        "clip_score": clip_score,  # Score CLIP jika tersedia
+        "cnn_score": cnn_score,  # Score CNN jika tersedia
+        "decision": {  # Detail keputusan
+            "status": status,  # Status keputusan
+            "risk_level": risk_level,  # Level risiko
+            "requires_review": requires_review,  # Apakah perlu review manual
+            "reason": reason  # Alasan keputusan
+        }  # Menutup decision
+    }  # Menutup response
+
+
+def build_decision(overall_score, clip_score=None, cnn_score=None, preset=None, custom_thresholds=None):  # Fungsi utama membuat keputusan
     thresholds, threshold_source = get_thresholds(  # Mengambil threshold yang akan dipakai
         preset=preset,  # Preset dari request
         custom_thresholds=custom_thresholds  # Custom threshold dari request
@@ -60,50 +94,88 @@ def build_decision(overall_score, preset=None, custom_thresholds=None):  # Fungs
 
     round_decimals = settings["round_decimals"]  # Mengambil jumlah digit pembulatan
     score = round(float(overall_score), round_decimals)  # Membulatkan overall_score
+    clip = round_optional_score(clip_score, round_decimals)  # Membulatkan clip_score jika ada
+    cnn = round_optional_score(cnn_score, round_decimals)  # Membulatkan cnn_score jika ada
+    score_rules = get_score_rules()  # Mengambil rule CLIP/CNN
 
     high_threshold = thresholds["high"]  # Mengambil threshold high
     medium_threshold = thresholds["medium"]  # Mengambil threshold medium
     low_threshold = thresholds["low"]  # Mengambil threshold low
 
     if score >= high_threshold:  # Mengecek apakah skor masuk kategori high
-        return {  # Mengembalikan keputusan high similarity
-            "overall_score": score,  # Score utama
-            "decision": {  # Detail keputusan
-                "status": "high_similarity",  # Status high similarity
-                "risk_level": "high",  # Risiko tinggi
-                "requires_review": True,  # Perlu review manual
-                "reason": f"Kandidat dengan skor tertinggi melebihi threshold high {high_threshold} menggunakan mode {threshold_source}"  # Alasan keputusan
-            }  # Menutup decision
-        }  # Menutup response
+        return build_response(  # Mengembalikan keputusan high similarity
+            score,  # Overall score
+            clip,  # CLIP score
+            cnn,  # CNN score
+            "high_similarity",  # Status high similarity
+            "high",  # Risiko tinggi
+            True,  # Perlu review manual
+            f"Kandidat dengan skor tertinggi melebihi threshold high {high_threshold} menggunakan mode {threshold_source}"  # Alasan
+        )  # Menutup build_response
+
+    if clip is not None and cnn is not None:  # Jika score detail tersedia
+        if clip >= score_rules["clip_high"] and cnn >= score_rules["cnn_high"]:  # CLIP dan CNN sama-sama kuat
+            return build_response(  # Return high similarity berbasis dua sinyal
+                score,  # Overall score
+                clip,  # CLIP score
+                cnn,  # CNN score
+                "high_similarity",  # Status high similarity
+                "high",  # Risiko tinggi
+                True,  # Perlu review manual
+                f"CLIP score {clip} dan CNN score {cnn} melewati batas kuat ({score_rules['clip_high']}/{score_rules['cnn_high']})"  # Alasan
+            )  # Menutup build_response
+
+        if score >= score_rules["final_high"] and cnn >= score_rules["cnn_high"]:  # Final kuat dan detail visual cukup
+            return build_response(  # Return high similarity berbasis final + CNN
+                score,  # Overall score
+                clip,  # CLIP score
+                cnn,  # CNN score
+                "high_similarity",  # Status high similarity
+                "high",  # Risiko tinggi
+                True,  # Perlu review manual
+                f"Overall score {score} dan CNN score {cnn} melewati batas kuat ({score_rules['final_high']}/{score_rules['cnn_high']})"  # Alasan
+            )  # Menutup build_response
 
     if score >= medium_threshold:  # Mengecek apakah skor masuk kategori medium
-        return {  # Mengembalikan keputusan medium similarity
-            "overall_score": score,  # Score utama
-            "decision": {  # Detail keputusan
-                "status": "medium_similarity",  # Status medium similarity
-                "risk_level": "medium",  # Risiko sedang
-                "requires_review": True,  # Perlu review manual
-                "reason": f"Kandidat dengan skor tertinggi melebihi threshold medium {medium_threshold} menggunakan mode {threshold_source}"  # Alasan keputusan
-            }  # Menutup decision
-        }  # Menutup response
+        return build_response(  # Mengembalikan keputusan medium similarity
+            score,  # Overall score
+            clip,  # CLIP score
+            cnn,  # CNN score
+            "medium_similarity",  # Status medium similarity
+            "medium",  # Risiko sedang
+            True,  # Perlu review manual
+            f"Kandidat dengan skor tertinggi melebihi threshold medium {medium_threshold} menggunakan mode {threshold_source}"  # Alasan
+        )  # Menutup build_response
+
+    if clip is not None and cnn is not None:  # Jika score detail tersedia
+        if score >= score_rules["possible_final"] or clip >= score_rules["possible_clip"] or cnn >= score_rules["possible_cnn"]:  # Sinyal sedang
+            return build_response(  # Return possible plagiarism
+                score,  # Overall score
+                clip,  # CLIP score
+                cnn,  # CNN score
+                "possible_plagiarism",  # Status possible plagiarism
+                "medium",  # Risiko sedang
+                True,  # Perlu review manual
+                f"Salah satu sinyal melewati batas possible: overall>={score_rules['possible_final']}, CLIP>={score_rules['possible_clip']}, atau CNN>={score_rules['possible_cnn']}"  # Alasan
+            )  # Menutup build_response
 
     if score >= low_threshold:  # Mengecek apakah skor masuk kategori low
-        return {  # Mengembalikan keputusan low similarity
-            "overall_score": score,  # Score utama
-            "decision": {  # Detail keputusan
-                "status": "low_similarity",  # Status low similarity
-                "risk_level": "low",  # Risiko rendah
-                "requires_review": False,  # Tidak wajib review manual
-                "reason": f"Kandidat dengan skor tertinggi melebihi threshold low {low_threshold} menggunakan mode {threshold_source}"  # Alasan keputusan
-            }  # Menutup decision
-        }  # Menutup response
+        return build_response(  # Mengembalikan keputusan low similarity
+            score,  # Overall score
+            clip,  # CLIP score
+            cnn,  # CNN score
+            "low_similarity",  # Status low similarity
+            "low",  # Risiko rendah
+            False,  # Tidak wajib review manual
+            f"Kandidat dengan skor tertinggi melebihi threshold low {low_threshold} menggunakan mode {threshold_source}"  # Alasan
+        )  # Menutup build_response
 
-    return {  # Mengembalikan keputusan jika tidak signifikan
-        "overall_score": score,  # Score utama
-        "decision": {  # Detail keputusan
-            "status": "no_significant_similarity",  # Status tidak signifikan
-            "risk_level": "very_low",  # Risiko sangat rendah
-            "requires_review": False,  # Tidak perlu review manual
-            "reason": f"Kandidat dengan skor tertinggi berada di bawah threshold low {low_threshold} menggunakan mode {threshold_source}"  # Alasan keputusan
-        }  # Menutup decision
-    }  # Menutup response
+    return build_response(  # Mengembalikan keputusan jika tidak signifikan
+        score,  # Overall score
+        clip,  # CLIP score
+        cnn,  # CNN score
+        "no_significant_similarity",  # Status tidak signifikan
+        "very_low",  # Risiko sangat rendah
+        False,  # Tidak perlu review manual
+        f"Kandidat dengan skor tertinggi berada di bawah threshold low {low_threshold} menggunakan mode {threshold_source}"  # Alasan
+    )  # Menutup build_response

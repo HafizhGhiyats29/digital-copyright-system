@@ -26,3 +26,7 @@ services:
   decision-engine:
     base_url: "http://localhost:8005"
     health_path: "/health"
+
+  copyright-metadata-service:
+    base_url: "http://localhost:8006"
+    health_path: "/health"

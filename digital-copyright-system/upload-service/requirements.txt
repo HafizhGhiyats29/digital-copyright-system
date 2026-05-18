@@ -5,3 +5,4 @@ httpx
 pillow
 pydantic
 pyyaml
+cloudinary

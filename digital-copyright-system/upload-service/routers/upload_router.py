@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form  # Import FastAPI tools
 from typing import Optional  # Import Optional untuk parameter opsional
+from pydantic import BaseModel, Field  # Schema untuk registrasi metadata setelah pengecekan
 from utils.image_validator import validate_image  # Import validator gambar
 from services.web_search_client import send_to_web_search  # Import client web-search
 from schemas.response_schema import UploadResponse  # Import schema response
@@ -8,10 +9,242 @@ from config.settings import MAX_FILE_SIZE  # Import batas ukuran file
 from services.feature_client import get_embedding  # Import client feature-service
 from services.similarity_client import send_to_similarity  # Import client similarity-service
 from services.decision_client import send_to_decision  # Import client decision-engine
+from services.metadata_client import create_metadata, update_embedding_reference  # Client metadata service
+from services.cloudinary_client import delete_image, upload_image as upload_image_to_cloudinary  # Client Cloudinary untuk simpan gambar karya
+from services.embedding_client import DEFAULT_EMBEDDING_VERSION, insert_embedding  # Client similarity-service untuk simpan embedding Milvus
+from services.temporary_embedding_store import delete_temporary_embedding, get_temporary_embedding, review_temporary_embedding, save_temporary_embedding  # Simpan embedding sementara untuk registrasi
+import re  # Import regex untuk membuat public_id Cloudinary aman
 import uuid  # Import uuid untuk request id
 
 
 router = APIRouter()  # Membuat router FastAPI
+
+
+class RegisterMetadataRequest(BaseModel):  # Request registrasi metadata setelah upload/check aman
+    check_id: str = Field(..., description="ID hasil pengecekan dari endpoint upload")
+    ki_id: Optional[str] = None
+    ki_uuid: Optional[str] = None
+    title: str = Field(..., min_length=1)
+    description: Optional[str] = None
+    category: Optional[str] = None
+    sub_category: Optional[str] = None
+    copyright_category: Optional[str] = None
+    copyright_sub_category: Optional[str] = None
+    image_url: Optional[str] = None
+    cloudinary_public_id: Optional[str] = None
+
+
+class ReviewCheckRequest(BaseModel):  # Request keputusan review manual untuk check_id
+    reason: Optional[str] = Field(default=None, description="Catatan/alasan reviewer")
+
+
+class DeleteCloudinaryRequest(BaseModel):  # Request hapus gambar Cloudinary dari gateway/orchestrator
+    public_id: str = Field(..., min_length=1, description="Cloudinary public_id gambar yang akan dihapus")
+
+
+def build_cloudinary_public_id(title: str, identifier: Optional[str]) -> str:  # Membuat nama file Cloudinary yang readable dan unik
+    title_slug = re.sub(r"[^a-zA-Z0-9]+", "-", title.strip().lower()).strip("-")
+    identifier_slug = re.sub(r"[^a-zA-Z0-9]+", "-", (identifier or "").strip()).strip("-")
+
+    if title_slug and identifier_slug:
+        return f"{title_slug}-{identifier_slug}"
+
+    return title_slug or identifier_slug or str(uuid.uuid4())
+
+
+def build_registration_gate(decision_result):  # Menentukan apakah hasil cek boleh lanjut registrasi
+    decision = decision_result.get("decision", {}) if decision_result else {}  # Ambil detail keputusan
+    status = decision.get("status", "unknown")  # Ambil status decision
+    requires_review = bool(decision.get("requires_review", True))  # Default aman: perlu review
+
+    if status == "high_similarity":  # Indikasi kuat plagiarisme
+        return {
+            "can_register": False,
+            "registration_status": "blocked",
+            "registration_reason": "Registrasi ditolak karena gambar terindikasi memiliki kemiripan tinggi.",
+        }
+
+    if requires_review:  # Kasus sedang/possible perlu review manual
+        return {
+            "can_register": False,
+            "registration_status": "review_required",
+            "registration_reason": "Registrasi ditahan karena hasil pengecekan masih membutuhkan review manual.",
+        }
+
+    return {
+        "can_register": True,
+        "registration_status": "allowed",
+        "registration_reason": "Registrasi diizinkan karena tidak ada indikasi plagiarisme yang perlu ditinjau.",
+    }
+
+
+@router.post("/register-metadata")  # Endpoint registrasi metadata yang wajib melewati hasil cek plagiarisme
+async def register_metadata(data: RegisterMetadataRequest):
+    temporary_check = get_temporary_embedding(data.check_id)  # Ambil hasil embedding/decision sementara
+
+    if temporary_check is None:  # Jika check_id tidak ditemukan atau expired
+        raise HTTPException(status_code=404, detail="Check ID tidak ditemukan atau sudah kedaluwarsa")
+
+    if not temporary_check["can_register"]:  # Jika hasil cek tidak aman
+        decision = temporary_check.get("decision", {})  # Ambil detail decision untuk response
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Metadata tidak dapat ditambahkan karena hasil pengecekan belum aman untuk registrasi",
+                "decision_result": decision,
+            },
+        )
+
+    metadata_payload = data.model_dump(exclude={"check_id"})  # Hilangkan check_id sebelum kirim ke metadata service
+    cloudinary_public_id = None  # Dipakai untuk rollback jika create metadata gagal
+
+    if not metadata_payload.get("image_url") and temporary_check.get("file_bytes") is not None:
+        try:
+            upload_result = await upload_image_to_cloudinary(  # Simpan gambar asli ke Cloudinary saat registrasi
+                temporary_check["file_bytes"],
+                public_id=build_cloudinary_public_id(data.title, data.ki_uuid or data.ki_id or data.check_id),
+            )
+            metadata_payload["image_url"] = upload_result.get("image_url")
+            metadata_payload["cloudinary_public_id"] = upload_result.get("cloudinary_public_id")
+            cloudinary_public_id = metadata_payload["cloudinary_public_id"]
+        except Exception as exc:
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "message": "Gagal menyimpan gambar ke Cloudinary",
+                    "error": str(exc),
+                },
+            ) from exc
+
+    metadata_payload.update({  # Set status embedding awal
+        "milvus_collection": None,
+        "milvus_id": None,
+        "embedding_version": None,
+        "embedding_status": "pending",
+    })
+
+    try:
+        created_metadata = await create_metadata(metadata_payload)  # Buat metadata jika aman
+    except Exception as exc:
+        if cloudinary_public_id:
+            await delete_image(cloudinary_public_id)
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "Gagal menyimpan metadata setelah gambar diupload ke Cloudinary",
+                "error": str(exc),
+            },
+        ) from exc
+    metadata_id = created_metadata["id"]  # ID metadata dipakai sebagai foreign key di Milvus
+
+    try:
+        embedding_result = await insert_embedding(  # Promosikan embedding sementara ke Milvus
+            metadata_id=metadata_id,
+            feature=temporary_check["feature"],
+            embedding_version=DEFAULT_EMBEDDING_VERSION,
+        )
+
+        updated_metadata = await update_embedding_reference(  # Simpan referensi vector ke metadata
+            metadata_id=metadata_id,
+            embedding_reference={
+                "milvus_collection": embedding_result.get("milvus_collection"),
+                "milvus_id": embedding_result.get("milvus_id"),
+                "embedding_version": embedding_result.get("embedding_version", DEFAULT_EMBEDDING_VERSION),
+                "embedding_status": "ready",
+            },
+        )
+
+    except Exception as exc:
+        try:
+            await update_embedding_reference(  # Tandai gagal agar metadata tidak terlihat siap dicari
+                metadata_id=metadata_id,
+                embedding_reference={
+                    "embedding_version": DEFAULT_EMBEDDING_VERSION,
+                    "embedding_status": "failed",
+                },
+            )
+        except Exception:
+            pass
+
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "Metadata berhasil dibuat, tetapi embedding gagal disimpan ke Milvus",
+                "metadata_id": metadata_id,
+                "error": str(exc),
+            },
+        ) from exc
+
+    delete_temporary_embedding(data.check_id)  # Hapus embedding sementara setelah berhasil dipromosikan
+
+    return {
+        "status": "registered",
+        "check_id": data.check_id,
+        "metadata": updated_metadata,
+        "embedding": embedding_result,
+        "embedding_status": "ready",
+        "message": "Metadata berhasil ditambahkan dan embedding sudah tersimpan di Milvus.",
+    }
+
+
+@router.post("/review-check/{check_id}/approve")  # Endpoint approval manual untuk hasil cek yang butuh review
+async def approve_check(check_id: str, data: ReviewCheckRequest | None = None):
+    reviewed = review_temporary_embedding(
+        check_id=check_id,
+        approved=True,
+        reason=data.reason if data else None,
+    )
+
+    if reviewed is None:
+        raise HTTPException(status_code=404, detail="Check ID tidak ditemukan atau sudah kedaluwarsa")
+
+    return {
+        "check_id": check_id,
+        "can_register": True,
+        "manual_review_status": "approved",
+        "manual_review_reason": reviewed.get("manual_review_reason"),
+        "message": "Hasil cek disetujui reviewer. Metadata dapat didaftarkan menggunakan check_id ini.",
+    }
+
+
+@router.post("/review-check/{check_id}/reject")  # Endpoint penolakan manual untuk hasil cek
+async def reject_check(check_id: str, data: ReviewCheckRequest | None = None):
+    reviewed = review_temporary_embedding(
+        check_id=check_id,
+        approved=False,
+        reason=data.reason if data else None,
+    )
+
+    if reviewed is None:
+        raise HTTPException(status_code=404, detail="Check ID tidak ditemukan atau sudah kedaluwarsa")
+
+    return {
+        "check_id": check_id,
+        "can_register": False,
+        "manual_review_status": "rejected",
+        "manual_review_reason": reviewed.get("manual_review_reason"),
+        "message": "Hasil cek ditolak reviewer. Metadata tidak dapat didaftarkan.",
+    }
+
+
+@router.post("/cloudinary/delete")  # Endpoint internal untuk hapus gambar Cloudinary saat metadata dihapus
+async def delete_cloudinary_image(data: DeleteCloudinaryRequest):
+    try:
+        result = await delete_image(data.public_id)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "Gagal menghapus gambar Cloudinary",
+                "public_id": data.public_id,
+                "error": str(exc),
+            },
+        ) from exc
+
+    return {
+        "public_id": data.public_id,
+        "cloudinary_result": result,
+    }
 
 
 @router.post("/upload", response_model=UploadResponse)  # Endpoint upload gambar
@@ -79,17 +312,40 @@ async def upload_image(  # Fungsi menerima upload gambar dan threshold
     )  # Menutup similarity call
 
     overall_score = similarity_result.get("overall_score", 0.0)  # Ambil overall_score dari similarity-service
+    best_match = similarity_result.get("best_match") or {}  # Ambil kandidat terbaik untuk detail score
+    clip_score = best_match.get("clip_score")  # Ambil clip_score kandidat terbaik jika ada
+    cnn_score = best_match.get("cnn_score")  # Ambil cnn_score kandidat terbaik jika ada
 
     decision_result = await send_to_decision(  # Kirim overall_score ke decision-engine
         overall_score=overall_score,  # Score utama similarity
+        clip_score=clip_score,  # Score CLIP kandidat terbaik
+        cnn_score=cnn_score,  # Score CNN kandidat terbaik
         preset=preset,  # Preset dari frontend
         thresholds=custom_thresholds  # Custom threshold dari frontend
     )  # Menutup decision call
 
+    registration_gate = build_registration_gate(decision_result)  # Tentukan izin registrasi
+    check_id = request_id  # Gunakan request id sebagai id pengecekan
+
+    save_temporary_embedding(  # Simpan embedding sementara untuk dipakai ulang jika registrasi diizinkan
+        check_id=check_id,  # ID pengecekan
+        feature=original_feature,  # Embedding hasil feature extraction
+        decision=decision_result,  # Keputusan hasil pengecekan
+        can_register=registration_gate["can_register"],  # Status izin registrasi
+        file_bytes=file_bytes,  # Bytes gambar asli untuk upload Cloudinary saat registrasi
+        filename=file.filename,  # Nama file asli untuk audit sederhana
+    )  # Menutup penyimpanan embedding sementara
+
     return {  # Mengembalikan response final ke frontend
         "status": "processed",  # Status proses
+        "check_id": check_id,  # ID hasil pengecekan untuk registrasi lanjutan
+        "can_register": registration_gate["can_register"],  # Apakah boleh registrasi metadata
+        "registration_status": registration_gate["registration_status"],  # Status registrasi
+        "registration_reason": registration_gate["registration_reason"],  # Alasan keputusan registrasi
         "original_feature": original_feature,  # Embedding original
         "web_search_result": web_result,  # Hasil web search
         "similarity_result": similarity_result,  # Hasil similarity
         "decision_result": decision_result  # Hasil decision-engine
     }  # Menutup response dictionary
+
+
