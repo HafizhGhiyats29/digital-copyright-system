@@ -11,7 +11,6 @@ env/
 venv/
 ENV/
 .venv/
-database/
 
 # === IDE / Editor ===
 .vscode/
@@ -49,3 +48,7 @@ pip-wheel-metadata/
 *.tmp
 *.temp
 database/milvus/volumes/
+# Local Milvus / MinIO / etcd volume data
+digital-copyright-system/database/milvus/volumes/
+database/milvus/volumes/
+EOF
