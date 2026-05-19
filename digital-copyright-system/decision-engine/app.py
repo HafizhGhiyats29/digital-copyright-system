@@ -2,7 +2,7 @@ from fastapi import FastAPI  # import FastAPI
 from routers.decision_router import router as decision_router  # import decision router
 
 
-app = FastAPI(title="Upload Service")  # membuat instance FastAPI
+app = FastAPI(title="Decision Engine")  # membuat instance FastAPI
 
 
 app.include_router(decision_router)  # menambahkan decision router ke aplikasi
