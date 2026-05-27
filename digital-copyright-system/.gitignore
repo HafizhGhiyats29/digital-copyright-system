@@ -1,0 +1,23 @@
+﻿# Secrets
+.env
+**/.env
+*.env.local
+
+# Python runtime
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest_tmp/
+venv/
+.venv/
+
+# Logs
+logs/
+*.log
+
+# Local database/runtime data
+database/mongodb/data/
+database/milvus/volumes/
+
+# Local generated metadata fallback
+copyright-metadata-service/data/metadata.json

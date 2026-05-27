@@ -1,17 +1,29 @@
-default_preset: "strict"
-
-default_thresholds:
-  high: 0.90
-  medium: 0.75
-  low: 0.60
+default_preset: "balanced"
 
 score_rules:
-  clip_high: 0.88
-  cnn_high: 0.75
-  final_high: 0.82
-  possible_final: 0.65
-  possible_clip: 0.80
-  possible_cnn: 0.60
+  strict:
+    clip_high: 0.90
+    cnn_high: 0.78
+    final_high: 0.86
+    possible_final: 0.70
+    possible_clip: 0.83
+    possible_cnn: 0.65
+
+  balanced:
+    clip_high: 0.88
+    cnn_high: 0.75
+    final_high: 0.82
+    possible_final: 0.65
+    possible_clip: 0.80
+    possible_cnn: 0.60
+
+  sensitive:
+    clip_high: 0.84
+    cnn_high: 0.70
+    final_high: 0.78
+    possible_final: 0.58
+    possible_clip: 0.76
+    possible_cnn: 0.55
 
 presets:
   strict:

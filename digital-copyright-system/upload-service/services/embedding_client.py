@@ -1,6 +1,7 @@
-import httpx
+﻿import httpx
 
 from config.settings import config
+from utils.internal_auth import internal_auth_headers
 
 
 EMBEDDING_SERVICE_URL = config["embedding_service_url"]
@@ -21,6 +22,7 @@ async def insert_embedding(metadata_id: str, feature: dict, embedding_version: s
         response = await client.post(
             EMBEDDING_SERVICE_URL,
             json=payload,
+            headers=internal_auth_headers(),
         )
         response.raise_for_status()
         return response.json()

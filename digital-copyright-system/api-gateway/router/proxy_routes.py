@@ -1,4 +1,4 @@
-from datetime import datetime  # Import datetime untuk response schema metadata
+﻿from datetime import datetime  # Import datetime untuk response schema metadata
 from typing import Optional  # Import Optional untuk form yang tidak wajib diisi
 
 import httpx  # Import HTTP client exception untuk orchestration delete
@@ -217,8 +217,10 @@ async def delete_metadata_item(request: Request, metadata_id: str):  # Handler p
     vector_url = build_target_url("similarity-check-service", f"/embeddings/{metadata_id}")  # URL hapus vector Milvus
     cloudinary_url = build_target_url("upload-service", "/cloudinary/delete")  # URL hapus gambar Cloudinary
 
+    internal_headers = {"X-Internal-API-Key": request.app.state.settings.internal_api_key} if getattr(request.app.state, "settings", None) and request.app.state.settings.internal_api_key else {}
+
     try:  # Ambil metadata dulu agar tahu public_id Cloudinary
-        metadata_response = await client.get(metadata_url)  # Request detail metadata
+        metadata_response = await client.get(metadata_url, headers=internal_headers)  # Request detail metadata
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Gagal mengambil metadata: {exc}") from exc
 
@@ -233,7 +235,7 @@ async def delete_metadata_item(request: Request, metadata_id: str):  # Handler p
 
     if public_id:  # Hapus gambar Cloudinary jika ada
         try:
-            cloudinary_response = await client.post(cloudinary_url, json={"public_id": public_id})
+            cloudinary_response = await client.post(cloudinary_url, json={"public_id": public_id}, headers=internal_headers)
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=502, detail=f"Gagal menghapus gambar Cloudinary: {exc}") from exc
 
@@ -247,7 +249,7 @@ async def delete_metadata_item(request: Request, metadata_id: str):  # Handler p
             raise HTTPException(status_code=cloudinary_response.status_code, detail=cleanup)
 
     try:  # Hapus vector Milvus
-        vector_response = await client.delete(vector_url)
+        vector_response = await client.delete(vector_url, headers=internal_headers)
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Gagal menghapus vector Milvus: {exc}") from exc
 
@@ -261,7 +263,7 @@ async def delete_metadata_item(request: Request, metadata_id: str):  # Handler p
         raise HTTPException(status_code=vector_response.status_code, detail=cleanup)
 
     try:  # Terakhir hapus metadata
-        delete_response = await client.delete(metadata_url)
+        delete_response = await client.delete(metadata_url, headers=internal_headers)
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Gagal menghapus metadata: {exc}") from exc
 
@@ -330,3 +332,4 @@ async def delete_metadata_vector(request: Request, metadata_id: str):  # Handler
 # async def decision(request: Request):  # Handler request decision
 #     # Direct proxy for risk-level decision calculation.
 #     return await proxy_request(request, "decision-engine", "/decision")  # Forward ke decision-engine
+

@@ -1,13 +1,14 @@
-from fastapi import APIRouter, HTTPException  # Mengimpor router dan HTTPException dari FastAPI
+﻿from fastapi import APIRouter, HTTPException, Depends  # Mengimpor router dan HTTPException dari FastAPI
 from schemas.decision_schema import DecisionRequest, DecisionResponse  # Mengimpor schema request dan response
 from services.decision_service import build_decision  # Mengimpor service decision
-from utils.logger import logger  # Mengimpor logger
+from utils.logger import logger
+from utils.internal_auth import require_internal_api_key  # Mengimpor logger
 
 
 router = APIRouter()  # Membuat router FastAPI
 
 
-@router.post("/decision", response_model=DecisionResponse)  # Endpoint decision-engine
+@router.post("/decision", response_model=DecisionResponse, dependencies=[Depends(require_internal_api_key)])  # Endpoint decision-engine
 async def create_decision(request: DecisionRequest):  # Fungsi menerima request decision
     try:  # Memulai error handling
         logger.info(  # Log score yang diterima
@@ -28,3 +29,5 @@ async def create_decision(request: DecisionRequest):  # Fungsi menerima request 
     except ValueError as e:  # Menangkap error validasi threshold
         logger.warning(f"Invalid decision request: {str(e)}")  # Log request tidak valid
         raise HTTPException(status_code=400, detail=str(e))  # Mengembalikan error 400 ke client
+
+

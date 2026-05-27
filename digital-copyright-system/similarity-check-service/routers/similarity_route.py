@@ -1,13 +1,14 @@
-from fastapi import APIRouter, HTTPException  # Mengimpor APIRouter dari FastAPI
+﻿from fastapi import APIRouter, HTTPException, Depends  # Mengimpor APIRouter dari FastAPI
 from schemas.response_schema import EmbeddingInsertRequest, SimilarityRequest  # Mengimpor schema request similarity
 from services.milvus_client import delete_embedding_by_metadata_id, insert_embedding  # Insert/delete embedding ke Milvus
-from services.similarity_service import compute_similarity  # Mengimpor service utama similarity
+from services.similarity_service import compute_similarity
+from utils.internal_auth import require_internal_api_key  # Mengimpor service utama similarity
 
 
 router = APIRouter()  # Membuat router FastAPI
 
 
-@router.post("/similarity")  # Membuat endpoint POST /similarity
+@router.post("/similarity", dependencies=[Depends(require_internal_api_key)])  # Membuat endpoint POST /similarity
 async def similarity_check(request: SimilarityRequest):  # Fungsi endpoint menerima request similarity
     result = await compute_similarity(  # Menjalankan proses similarity
         request.clip_embedding,  # Mengirim embedding CLIP gambar input
@@ -18,7 +19,7 @@ async def similarity_check(request: SimilarityRequest):  # Fungsi endpoint mener
     return result  # Mengembalikan hasil final ke client/upload-service
 
 
-@router.post("/embeddings")
+@router.post("/embeddings", dependencies=[Depends(require_internal_api_key)])
 async def create_embedding(request: EmbeddingInsertRequest):
     try:
         return insert_embedding(
@@ -32,9 +33,11 @@ async def create_embedding(request: EmbeddingInsertRequest):
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-@router.delete("/embeddings/{metadata_id}")
+@router.delete("/embeddings/{metadata_id}", dependencies=[Depends(require_internal_api_key)])
 async def delete_embedding(metadata_id: str):
     try:
         return delete_embedding_by_metadata_id(metadata_id)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+

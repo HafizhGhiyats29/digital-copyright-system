@@ -1,4 +1,4 @@
-from contextlib import asynccontextmanager  # Import helper untuk lifecycle startup/shutdown FastAPI
+﻿from contextlib import asynccontextmanager  # Import helper untuk lifecycle startup/shutdown FastAPI
 
 import httpx  # Import HTTP client async untuk request ke service lain
 from fastapi import FastAPI  # Import class utama FastAPI
@@ -29,6 +29,7 @@ def create_app() -> FastAPI:  # Factory function untuk membuat instance FastAPI
     )  # Menutup konfigurasi FastAPI
 
     # Add cross-cutting middleware before registering route handlers.
+    app.state.settings = settings  # Simpan settings agar router manual bisa memakai internal API key
     app.add_middleware(RequestIdMiddleware)  # Menambahkan request id untuk tracing request
     app.add_middleware(  # Menambahkan middleware CORS
         CORSMiddleware,  # Class middleware CORS dari FastAPI/Starlette
@@ -46,3 +47,4 @@ def create_app() -> FastAPI:  # Factory function untuk membuat instance FastAPI
 
 
 app = create_app()  # Instance aplikasi yang dibaca oleh uvicorn
+

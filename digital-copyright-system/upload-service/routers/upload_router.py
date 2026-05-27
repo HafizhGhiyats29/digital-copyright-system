@@ -1,7 +1,8 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form  # Import FastAPI tools
+﻿from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends  # Import FastAPI tools
 from typing import Optional  # Import Optional untuk parameter opsional
 from pydantic import BaseModel, Field  # Schema untuk registrasi metadata setelah pengecekan
-from utils.image_validator import validate_image  # Import validator gambar
+from utils.image_validator import validate_image
+from utils.internal_auth import require_internal_api_key  # Import validator gambar
 from services.web_search_client import send_to_web_search  # Import client web-search
 from schemas.response_schema import UploadResponse  # Import schema response
 from utils.logger import logger  # Import logger
@@ -78,7 +79,7 @@ def build_registration_gate(decision_result):  # Menentukan apakah hasil cek bol
     }
 
 
-@router.post("/register-metadata")  # Endpoint registrasi metadata yang wajib melewati hasil cek plagiarisme
+@router.post("/register-metadata", dependencies=[Depends(require_internal_api_key)])  # Endpoint registrasi metadata yang wajib melewati hasil cek plagiarisme
 async def register_metadata(data: RegisterMetadataRequest):
     temporary_check = get_temporary_embedding(data.check_id)  # Ambil hasil embedding/decision sementara
 
@@ -187,7 +188,7 @@ async def register_metadata(data: RegisterMetadataRequest):
     }
 
 
-@router.post("/review-check/{check_id}/approve")  # Endpoint approval manual untuk hasil cek yang butuh review
+@router.post("/review-check/{check_id}/approve", dependencies=[Depends(require_internal_api_key)])  # Endpoint approval manual untuk hasil cek yang butuh review
 async def approve_check(check_id: str, data: ReviewCheckRequest | None = None):
     reviewed = review_temporary_embedding(
         check_id=check_id,
@@ -207,7 +208,7 @@ async def approve_check(check_id: str, data: ReviewCheckRequest | None = None):
     }
 
 
-@router.post("/review-check/{check_id}/reject")  # Endpoint penolakan manual untuk hasil cek
+@router.post("/review-check/{check_id}/reject", dependencies=[Depends(require_internal_api_key)])  # Endpoint penolakan manual untuk hasil cek
 async def reject_check(check_id: str, data: ReviewCheckRequest | None = None):
     reviewed = review_temporary_embedding(
         check_id=check_id,
@@ -227,7 +228,7 @@ async def reject_check(check_id: str, data: ReviewCheckRequest | None = None):
     }
 
 
-@router.post("/cloudinary/delete")  # Endpoint internal untuk hapus gambar Cloudinary saat metadata dihapus
+@router.post("/cloudinary/delete", dependencies=[Depends(require_internal_api_key)])  # Endpoint internal untuk hapus gambar Cloudinary saat metadata dihapus
 async def delete_cloudinary_image(data: DeleteCloudinaryRequest):
     try:
         result = await delete_image(data.public_id)
@@ -347,5 +348,7 @@ async def upload_image(  # Fungsi menerima upload gambar dan threshold
         "similarity_result": similarity_result,  # Hasil similarity
         "decision_result": decision_result  # Hasil decision-engine
     }  # Menutup response dictionary
+
+
 
 

@@ -148,6 +148,10 @@ def calculate_metrics(results: list[PairResult]) -> dict[str, float]:
         result.label == "plagiarized" and result.prediction == "not_plagiarized"
         for result in results
     )
+    true_negative = sum(
+        result.label == "not_plagiarized" and result.prediction == "not_plagiarized"
+        for result in results
+    )
 
     accuracy = correct / total if total else 0.0
     precision = true_positive / (true_positive + false_positive) if true_positive + false_positive else 0.0
@@ -163,6 +167,7 @@ def calculate_metrics(results: list[PairResult]) -> dict[str, float]:
         "true_positive": float(true_positive),
         "false_positive": float(false_positive),
         "false_negative": float(false_negative),
+        "true_negative": float(true_negative),
     }
 
 
@@ -247,6 +252,7 @@ async def main() -> None:
     print(f"True Positives: {int(metrics['true_positive'])}")
     print(f"False Positives: {int(metrics['false_positive'])}")
     print(f"False Negatives: {int(metrics['false_negative'])}")
+    print(f"True Negatives: {int(metrics['true_negative'])}")
     print(f"Saved: {args.output}")
 
 
@@ -254,3 +260,4 @@ if __name__ == "__main__":
     import asyncio
 
     asyncio.run(main())
+

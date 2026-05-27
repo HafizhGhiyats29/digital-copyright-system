@@ -1,4 +1,4 @@
-feature_service_url: "http://localhost:8002/extract"
+﻿feature_service_url: "http://localhost:8002/extract"
 web_search_service_url: "http://localhost:8001/search"
 similarity_service_url: "http://localhost:8003/similarity"
 decision_service_url: "http://localhost:8005/decision"
@@ -10,7 +10,4 @@ max_file_size: 5242880   # 5MB
 request_timeout: 20
 
 cloudinary:
-  cloud_name: "daz3btopf"
-  api_key: "696374738892441"
-  api_secret: "B8JtgyGy_Rk1pJ1b_6P4TgGvFG8"
   folder: "copyright-registrations"

@@ -1,4 +1,4 @@
-import httpx  # Import HTTP client async dan exception
+﻿import httpx  # Import HTTP client async dan exception
 from fastapi import HTTPException, Request, Response, UploadFile, status  # Import komponen FastAPI untuk proxy
 
 from config.settings import settings  # Import registry service dari config
@@ -25,6 +25,8 @@ async def proxy_request(request: Request, service_name: str, path: str) -> Respo
     body = await request.body()  # Baca body request asli dari client
     headers = filter_proxy_headers(request.headers)  # Filter header request sebelum diteruskan
     headers[REQUEST_ID_HEADER] = request.state.request_id  # Teruskan request id ke upstream service
+    if settings.internal_api_key:
+        headers["X-Internal-API-Key"] = settings.internal_api_key
 
     try:  # Mulai proses request ke upstream service
         upstream_response = await client.request(  # Kirim request ke upstream service
@@ -73,6 +75,8 @@ async def proxy_multipart_request(  # Forward request multipart yang dibangun ul
     headers = filter_proxy_headers(request.headers)  # Filter header request sebelum diteruskan
     headers.pop("content-type", None)  # Hapus content-type agar httpx membuat boundary multipart baru
     headers[REQUEST_ID_HEADER] = request.state.request_id  # Teruskan request id ke upstream service
+    if settings.internal_api_key:
+        headers["X-Internal-API-Key"] = settings.internal_api_key
     file_bytes = await file.read()  # Baca file upload menjadi bytes
     data = {  # Siapkan form data tambahan
         key: str(value)  # Ubah value menjadi string form field
@@ -118,3 +122,4 @@ async def proxy_multipart_request(  # Forward request multipart yang dibangun ul
         headers=response_headers,  # Header response yang aman diteruskan
         media_type=upstream_response.headers.get("content-type"),  # Content-Type dari upstream
     )  # Menutup response gateway
+

@@ -1,30 +1,30 @@
-import httpx  # Import HTTP client async
-from config.settings import WEB_SEARCH_SERVICE_URL  # Import URL web-search-service
+﻿import httpx
+
+from config.settings import WEB_SEARCH_SERVICE_URL
+from utils.internal_auth import internal_auth_headers
 
 
-async def send_to_web_search(file_bytes):  # Fungsi kirim file ke web-search-service
-    timeout = httpx.Timeout(60.0)  # Timeout aman untuk proses web search
+async def send_to_web_search(file_bytes):
+    timeout = httpx.Timeout(60.0)
 
-    try:  # Error handling request
-        async with httpx.AsyncClient(timeout=timeout) as client:  # Membuat HTTP client dengan timeout
-            files = {  # Membuat file multipart
-                "image": ("image.jpg", file_bytes, "image/jpeg")  # Field harus "image" sesuai search_router.py
-            }  # Menutup dictionary files
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            files = {
+                "image": ("image.jpg", file_bytes, "image/jpeg"),
+            }
+            response = await client.post(
+                WEB_SEARCH_SERVICE_URL,
+                files=files,
+                headers=internal_auth_headers(),
+            )
+            response.raise_for_status()
+            return response.json()
 
-            response = await client.post(  # Mengirim request POST ke web-search-service
-                WEB_SEARCH_SERVICE_URL,  # URL endpoint /search
-                files=files  # File gambar yang dikirim
-            )  # Menutup request
+    except httpx.ConnectError:
+        return {"found_on_web": False, "matches": [], "error": "Web Search Service tidak tersedia"}
 
-            response.raise_for_status()  # Lempar error jika response bukan 2xx
+    except httpx.ReadTimeout:
+        return {"found_on_web": False, "matches": [], "error": "Web Search timeout"}
 
-            return response.json()  # Return hasil web search
-
-    except httpx.ConnectError:  # Jika service tidak aktif
-        return {"found_on_web": False, "matches": [], "error": "Web Search Service tidak tersedia"}  # Response aman
-
-    except httpx.ReadTimeout:  # Jika service terlalu lama
-        return {"found_on_web": False, "matches": [], "error": "Web Search timeout"}  # Response timeout
-
-    except httpx.HTTPStatusError as e:  # Jika status HTTP error
-        return {"found_on_web": False, "matches": [], "error": f"Web Search HTTP error: {str(e)}"}  # Response error HTTP
+    except httpx.HTTPStatusError as exc:
+        return {"found_on_web": False, "matches": [], "error": f"Web Search HTTP error: {exc}"}

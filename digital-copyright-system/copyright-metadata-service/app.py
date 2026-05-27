@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, status
+﻿from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from models.metadata_model import (
@@ -7,6 +7,7 @@ from models.metadata_model import (
     MetadataResponse,
     MetadataUpdate,
 )
+from utils.internal_auth import require_internal_api_key
 from services.metadata_store import (
     check_storage_health,
     create_metadata,
@@ -43,7 +44,7 @@ def root():
     return {"message": "Copyright Metadata Service API jalan"}
 
 
-@app.post("/metadata/migrate-json-to-mongodb")
+@app.post("/metadata/migrate-json-to-mongodb", dependencies=[Depends(require_internal_api_key)])
 def migrate_json_metadata_to_mongodb():
     return migrate_json_to_mongodb()
 
@@ -52,6 +53,7 @@ def migrate_json_metadata_to_mongodb():
     "/metadata",
     response_model=MetadataResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_internal_api_key)],
 )
 def create(data: MetadataCreate):
     return create_metadata(data.model_dump())
@@ -73,7 +75,7 @@ def read_by_id(metadata_id: str):
     return item
 
 
-@app.put("/metadata/{metadata_id}", response_model=MetadataResponse)
+@app.put("/metadata/{metadata_id}", response_model=MetadataResponse, dependencies=[Depends(require_internal_api_key)])
 def update(metadata_id: str, data: MetadataUpdate):
     payload = data.model_dump(exclude_unset=True)
     if not payload:
@@ -91,7 +93,7 @@ def update(metadata_id: str, data: MetadataUpdate):
     return item
 
 
-@app.patch("/metadata/{metadata_id}/embedding", response_model=MetadataResponse)
+@app.patch("/metadata/{metadata_id}/embedding", response_model=MetadataResponse, dependencies=[Depends(require_internal_api_key)])
 def update_embedding_reference(metadata_id: str, data: EmbeddingReferenceUpdate):
     payload = data.model_dump(exclude_unset=True)
 
@@ -104,7 +106,7 @@ def update_embedding_reference(metadata_id: str, data: EmbeddingReferenceUpdate)
     return item
 
 
-@app.delete("/metadata/{metadata_id}")
+@app.delete("/metadata/{metadata_id}", dependencies=[Depends(require_internal_api_key)])
 def delete(metadata_id: str):
     deleted = delete_metadata(metadata_id)
     if not deleted:
@@ -113,3 +115,7 @@ def delete(metadata_id: str):
             detail="Metadata not found",
         )
     return {"message": "deleted", "id": metadata_id}
+
+
+
+

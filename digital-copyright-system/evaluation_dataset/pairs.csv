@@ -164,7 +164,174 @@ same/Siamese_fighting_fish_towards_light_original.jpg,same/Siput-Mata-Bulan_orig
 same/Siamese_fighting_fish_towards_light_original.jpg,same/Suasana-Lomba-kemerdekaan_original.png,not_plagiarized
 same/Siput-Mata-Bulan_original.png,same/Suasana-Lomba-kemerdekaan_original.png,not_plagiarized
 same/chisa_original.png,different/Okuri.png,not_plagiarized
-same/chisa_original.png,different/sample 2.jpg,not_plagiarized
 same/chisa_original.png,different/wikabichan-lily.jpg,not_plagiarized
+same/All eyes on me_original.png,same/All eyes on me_compress.png,plagiarized
+same/All eyes on me_original.png,same/All eyes on me_copy.png,plagiarized
+same/All eyes on me_original.png,same/All eyes on me_resize.jpg,plagiarized
+same/All eyes on me_original.png,modified/All eyes on me_blur.jpg,plagiarized
+same/All eyes on me_original.png,modified/All eyes on me_brightness.png,plagiarized
+same/All eyes on me_original.png,modified/All eyes on me_contrast.png,plagiarized
+same/All eyes on me_original.png,modified/All eyes on me_crop.jpg,plagiarized
+same/All eyes on me_original.png,modified/All eyes on me_rotate.png,plagiarized
+same/All eyes on me_original.png,modified/All eyes on me_watermark.png,plagiarized
+same/All eyes on me_original.png,different/All eyes on me.png,plagiarized
+same/Demi konten_original.jpg,same/Demi konten_compress.png,plagiarized
+same/Demi konten_original.jpg,same/Demi konten_copy.jpg,plagiarized
+same/Demi konten_original.jpg,same/Demi konten_resize.jpg,plagiarized
+same/Demi konten_original.jpg,modified/Demi konten_blur.jpg,plagiarized
+same/Demi konten_original.jpg,modified/Demi konten_brightness.jpg,plagiarized
+same/Demi konten_original.jpg,modified/Demi konten_contrast.jpg,plagiarized
+same/Demi konten_original.jpg,modified/Demi konten_crop.jpg,plagiarized
+same/Demi konten_original.jpg,modified/Demi konten_rotate.png,plagiarized
+same/Demi konten_original.jpg,modified/Demi konten_watermark.png,plagiarized
+same/Demi konten_original.jpg,different/Demi konten.jpg,plagiarized
+same/Look at you_original.jpg,same/Look at you_compress.png,plagiarized
+same/Look at you_original.jpg,same/Look at you_copy.jpg,plagiarized
+same/Look at you_original.jpg,same/Look at you_resize.jpg,plagiarized
+same/Look at you_original.jpg,modified/Look at you_blur.jpg,plagiarized
+same/Look at you_original.jpg,modified/Look at you_brightness.jpg,plagiarized
+same/Look at you_original.jpg,modified/Look at you_contrast.jpg,plagiarized
+same/Look at you_original.jpg,modified/Look at you_crop.jpg,plagiarized
+same/Look at you_original.jpg,modified/Look at you_rotate.png,plagiarized
+same/Look at you_original.jpg,modified/Look at you_watermark.jpg,plagiarized
+same/Look at you_original.jpg,different/Look at you.jpg,plagiarized
+same/Luminareflaur_original.png,same/Luminareflaur_compress.png,plagiarized
+same/Luminareflaur_original.png,same/Luminareflaur_copy.png,plagiarized
+same/Luminareflaur_original.png,same/Luminareflaur_resize.jpg,plagiarized
+same/Luminareflaur_original.png,modified/Luminareflaur_blur.jpg,plagiarized
+same/Luminareflaur_original.png,modified/Luminareflaur_brightness.png,plagiarized
+same/Luminareflaur_original.png,modified/Luminareflaur_contrast.png,plagiarized
+same/Luminareflaur_original.png,modified/Luminareflaur_crop.jpg,plagiarized
+same/Luminareflaur_original.png,modified/Luminareflaur_rotate.png,plagiarized
+same/Luminareflaur_original.png,modified/Luminareflaur_watermark.png,plagiarized
+same/Luminareflaur_original.png,different/Luminareflaur.png,plagiarized
+same/Soflyr academy of heros_original.png,same/Soflyr academy of heros_compress.png,plagiarized
+same/Soflyr academy of heros_original.png,same/Soflyr academy of heros_copy.png,plagiarized
+same/Soflyr academy of heros_original.png,same/Soflyr academy of heros_resize.jpg,plagiarized
+same/Soflyr academy of heros_original.png,modified/Soflyr academy of heros_blur.jpg,plagiarized
+same/Soflyr academy of heros_original.png,modified/Soflyr academy of heros_brightness.png,plagiarized
+same/Soflyr academy of heros_original.png,modified/Soflyr academy of heros_contrast.png,plagiarized
+same/Soflyr academy of heros_original.png,modified/Soflyr academy of heros_crop.jpg,plagiarized
+same/Soflyr academy of heros_original.png,modified/Soflyr academy of heros_rotate.png,plagiarized
+same/Soflyr academy of heros_original.png,modified/Soflyr academy of heros_watermark.png,plagiarized
+same/Soflyr academy of heros_original.png,different/Soflyr academy of heros.png,plagiarized
+same/Soulmate on phone_original.png,same/Soulmate on phone_compress.png,plagiarized
+same/Soulmate on phone_original.png,same/Soulmate on phone_copy.png,plagiarized
+same/Soulmate on phone_original.png,same/Soulmate on phone_resize.jpg,plagiarized
+same/Soulmate on phone_original.png,modified/Soulmate on phone_brightness.png,plagiarized
+same/Soulmate on phone_original.png,modified/Soulmate on phone_contrast.png,plagiarized
+same/Soulmate on phone_original.png,modified/Soulmate on phone_crop.jpg,plagiarized
+same/Soulmate on phone_original.png,modified/Soulmate on phone_resize.jpg,plagiarized
+same/Soulmate on phone_original.png,modified/Soulmate on phone_rotate.png,plagiarized
+same/Soulmate on phone_original.png,modified/Soulmate on phone_watermark.png,plagiarized
+same/Soulmate on phone_original.png,different/Soulmate on phone.png,plagiarized
+same/Village essence_original.png,same/Village essence_compress.png,plagiarized
+same/Village essence_original.png,same/Village essence_copy.png,plagiarized
+same/Village essence_original.png,same/Village essence_resize.jpg,plagiarized
+same/Village essence_original.png,modified/Village essence_blur.jpg,plagiarized
+same/Village essence_original.png,modified/Village essence_brightness.png,plagiarized
+same/Village essence_original.png,modified/Village essence_contrast.png,plagiarized
+same/Village essence_original.png,modified/Village essence_crop.jpg,plagiarized
+same/Village essence_original.png,modified/Village essence_rotate.png,plagiarized
+same/Village essence_original.png,modified/Village essence_watermark.png,plagiarized
+same/Village essence_original.png,different/Village essence.png,plagiarized
+same/Afternoon-with-Lily_original.png,same/All eyes on me_original.png,not_plagiarized
+same/Afternoon-with-Lily_original.png,same/Demi konten_original.jpg,not_plagiarized
+same/Afternoon-with-Lily_original.png,same/Look at you_original.jpg,not_plagiarized
+same/Afternoon-with-Lily_original.png,same/Luminareflaur_original.png,not_plagiarized
+same/Afternoon-with-Lily_original.png,same/Soflyr academy of heros_original.png,not_plagiarized
+same/Afternoon-with-Lily_original.png,same/Soulmate on phone_original.png,not_plagiarized
+same/Afternoon-with-Lily_original.png,same/Village essence_original.png,not_plagiarized
+same/All eyes on me_original.png,same/Anonymous_construction_original.jpg,not_plagiarized
+same/All eyes on me_original.png,same/Ayo_menabung_original.png,not_plagiarized
+same/All eyes on me_original.png,same/Beautiful-in-Season_original.png,not_plagiarized
+same/All eyes on me_original.png,same/chisa_original.png,not_plagiarized
+same/All eyes on me_original.png,same/Demi konten_original.jpg,not_plagiarized
+same/All eyes on me_original.png,same/Desain_ilustrasi_visit_bali_original.png,not_plagiarized
+same/All eyes on me_original.png,same/Lemon-Rebahan_original.png,not_plagiarized
+same/All eyes on me_original.png,same/Look at you_original.jpg,not_plagiarized
+same/All eyes on me_original.png,same/Luminareflaur_original.png,not_plagiarized
+same/All eyes on me_original.png,same/Serwataka_toguri_sharpie_original.png,not_plagiarized
+same/All eyes on me_original.png,same/Siamese_fighting_fish_towards_light_original.jpg,not_plagiarized
+same/All eyes on me_original.png,same/Siput-Mata-Bulan_original.png,not_plagiarized
+same/All eyes on me_original.png,same/Soflyr academy of heros_original.png,not_plagiarized
+same/All eyes on me_original.png,same/Soulmate on phone_original.png,not_plagiarized
+same/All eyes on me_original.png,same/Suasana-Lomba-kemerdekaan_original.png,not_plagiarized
+same/All eyes on me_original.png,same/Village essence_original.png,not_plagiarized
+same/Anonymous_construction_original.jpg,same/Demi konten_original.jpg,not_plagiarized
+same/Anonymous_construction_original.jpg,same/Look at you_original.jpg,not_plagiarized
+same/Anonymous_construction_original.jpg,same/Luminareflaur_original.png,not_plagiarized
+same/Anonymous_construction_original.jpg,same/Soflyr academy of heros_original.png,not_plagiarized
+same/Anonymous_construction_original.jpg,same/Soulmate on phone_original.png,not_plagiarized
+same/Anonymous_construction_original.jpg,same/Village essence_original.png,not_plagiarized
+same/Ayo_menabung_original.png,same/Demi konten_original.jpg,not_plagiarized
+same/Ayo_menabung_original.png,same/Look at you_original.jpg,not_plagiarized
+same/Ayo_menabung_original.png,same/Luminareflaur_original.png,not_plagiarized
+same/Ayo_menabung_original.png,same/Soflyr academy of heros_original.png,not_plagiarized
+same/Ayo_menabung_original.png,same/Soulmate on phone_original.png,not_plagiarized
+same/Ayo_menabung_original.png,same/Village essence_original.png,not_plagiarized
+same/Beautiful-in-Season_original.png,same/Demi konten_original.jpg,not_plagiarized
+same/Beautiful-in-Season_original.png,same/Look at you_original.jpg,not_plagiarized
+same/Beautiful-in-Season_original.png,same/Luminareflaur_original.png,not_plagiarized
+same/Beautiful-in-Season_original.png,same/Soflyr academy of heros_original.png,not_plagiarized
+same/Beautiful-in-Season_original.png,same/Soulmate on phone_original.png,not_plagiarized
+same/Beautiful-in-Season_original.png,same/Village essence_original.png,not_plagiarized
+same/chisa_original.png,same/Demi konten_original.jpg,not_plagiarized
+same/chisa_original.png,same/Look at you_original.jpg,not_plagiarized
+same/chisa_original.png,same/Luminareflaur_original.png,not_plagiarized
+same/chisa_original.png,same/Soflyr academy of heros_original.png,not_plagiarized
+same/chisa_original.png,same/Soulmate on phone_original.png,not_plagiarized
+same/chisa_original.png,same/Village essence_original.png,not_plagiarized
+same/Demi konten_original.jpg,same/Desain_ilustrasi_visit_bali_original.png,not_plagiarized
+same/Demi konten_original.jpg,same/Lemon-Rebahan_original.png,not_plagiarized
+same/Demi konten_original.jpg,same/Look at you_original.jpg,not_plagiarized
+same/Demi konten_original.jpg,same/Luminareflaur_original.png,not_plagiarized
+same/Demi konten_original.jpg,same/Serwataka_toguri_sharpie_original.png,not_plagiarized
+same/Demi konten_original.jpg,same/Siamese_fighting_fish_towards_light_original.jpg,not_plagiarized
+same/Demi konten_original.jpg,same/Siput-Mata-Bulan_original.png,not_plagiarized
+same/Demi konten_original.jpg,same/Soflyr academy of heros_original.png,not_plagiarized
+same/Demi konten_original.jpg,same/Soulmate on phone_original.png,not_plagiarized
+same/Demi konten_original.jpg,same/Suasana-Lomba-kemerdekaan_original.png,not_plagiarized
+same/Demi konten_original.jpg,same/Village essence_original.png,not_plagiarized
+same/Desain_ilustrasi_visit_bali_original.png,same/Look at you_original.jpg,not_plagiarized
+same/Desain_ilustrasi_visit_bali_original.png,same/Luminareflaur_original.png,not_plagiarized
+same/Desain_ilustrasi_visit_bali_original.png,same/Soflyr academy of heros_original.png,not_plagiarized
+same/Desain_ilustrasi_visit_bali_original.png,same/Soulmate on phone_original.png,not_plagiarized
+same/Desain_ilustrasi_visit_bali_original.png,same/Village essence_original.png,not_plagiarized
+same/Lemon-Rebahan_original.png,same/Look at you_original.jpg,not_plagiarized
+same/Lemon-Rebahan_original.png,same/Luminareflaur_original.png,not_plagiarized
+same/Lemon-Rebahan_original.png,same/Soflyr academy of heros_original.png,not_plagiarized
+same/Lemon-Rebahan_original.png,same/Soulmate on phone_original.png,not_plagiarized
+same/Lemon-Rebahan_original.png,same/Village essence_original.png,not_plagiarized
+same/Look at you_original.jpg,same/Luminareflaur_original.png,not_plagiarized
+same/Look at you_original.jpg,same/Serwataka_toguri_sharpie_original.png,not_plagiarized
+same/Look at you_original.jpg,same/Siamese_fighting_fish_towards_light_original.jpg,not_plagiarized
+same/Look at you_original.jpg,same/Siput-Mata-Bulan_original.png,not_plagiarized
+same/Look at you_original.jpg,same/Soflyr academy of heros_original.png,not_plagiarized
+same/Look at you_original.jpg,same/Soulmate on phone_original.png,not_plagiarized
+same/Look at you_original.jpg,same/Suasana-Lomba-kemerdekaan_original.png,not_plagiarized
+same/Look at you_original.jpg,same/Village essence_original.png,not_plagiarized
+same/Luminareflaur_original.png,same/Serwataka_toguri_sharpie_original.png,not_plagiarized
+same/Luminareflaur_original.png,same/Siamese_fighting_fish_towards_light_original.jpg,not_plagiarized
+same/Luminareflaur_original.png,same/Siput-Mata-Bulan_original.png,not_plagiarized
+same/Luminareflaur_original.png,same/Soflyr academy of heros_original.png,not_plagiarized
+same/Luminareflaur_original.png,same/Soulmate on phone_original.png,not_plagiarized
+same/Luminareflaur_original.png,same/Suasana-Lomba-kemerdekaan_original.png,not_plagiarized
+same/Luminareflaur_original.png,same/Village essence_original.png,not_plagiarized
+same/Serwataka_toguri_sharpie_original.png,same/Soflyr academy of heros_original.png,not_plagiarized
+same/Serwataka_toguri_sharpie_original.png,same/Soulmate on phone_original.png,not_plagiarized
+same/Serwataka_toguri_sharpie_original.png,same/Village essence_original.png,not_plagiarized
+same/Siamese_fighting_fish_towards_light_original.jpg,same/Soflyr academy of heros_original.png,not_plagiarized
+same/Siamese_fighting_fish_towards_light_original.jpg,same/Soulmate on phone_original.png,not_plagiarized
+same/Siamese_fighting_fish_towards_light_original.jpg,same/Village essence_original.png,not_plagiarized
+same/Siput-Mata-Bulan_original.png,same/Soflyr academy of heros_original.png,not_plagiarized
+same/Siput-Mata-Bulan_original.png,same/Soulmate on phone_original.png,not_plagiarized
+same/Siput-Mata-Bulan_original.png,same/Village essence_original.png,not_plagiarized
+same/Soflyr academy of heros_original.png,same/Soulmate on phone_original.png,not_plagiarized
+same/Soflyr academy of heros_original.png,same/Suasana-Lomba-kemerdekaan_original.png,not_plagiarized
+same/Soflyr academy of heros_original.png,same/Village essence_original.png,not_plagiarized
+same/Soulmate on phone_original.png,same/Suasana-Lomba-kemerdekaan_original.png,not_plagiarized
+same/Soulmate on phone_original.png,same/Village essence_original.png,not_plagiarized
+same/Suasana-Lomba-kemerdekaan_original.png,same/Village essence_original.png,not_plagiarized
 semantic_similar/tree_digital_1.jpg,semantic_similar/tree_digital_2.jpg,semantic_only
 semantic_similar/beach_different_design.jpg,semantic_similar/beach_other_design.jpg,semantic_only

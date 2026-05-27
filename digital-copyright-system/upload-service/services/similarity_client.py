@@ -1,23 +1,24 @@
-import httpx  # Import HTTP client async
-from config.settings import config  # Import config
+﻿import httpx
+
+from config.settings import config
+from utils.internal_auth import internal_auth_headers
 
 
-SIMILARITY_SERVICE_URL = config["similarity_service_url"]  # Ambil URL similarity-service dari config
+SIMILARITY_SERVICE_URL = config["similarity_service_url"]
 
 
-async def send_to_similarity(query_clip_embedding, query_cnn_embedding, web_matches):  # Fungsi kirim data ke similarity
-    timeout = httpx.Timeout(60.0)  # Timeout request ke similarity-service
+async def send_to_similarity(query_clip_embedding, query_cnn_embedding, web_matches):
+    timeout = httpx.Timeout(60.0)
 
-    async with httpx.AsyncClient(timeout=timeout) as client:  # Membuat HTTP client
-        response = await client.post(  # Mengirim POST request
-            SIMILARITY_SERVICE_URL,  # Endpoint similarity-service
-            json={  # Body JSON request
-                "clip_embedding": query_clip_embedding,  # Embedding CLIP gambar original
-                "cnn_embedding": query_cnn_embedding,  # Embedding CNN gambar original
-                "web_matches": web_matches  # Kandidat dari web-search-service
-            }  # Menutup JSON body
-        )  # Menutup request POST
-
-        response.raise_for_status()  # Lempar error jika response bukan 2xx
-
-        return response.json()  # Return hasil similarity
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.post(
+            SIMILARITY_SERVICE_URL,
+            json={
+                "clip_embedding": query_clip_embedding,
+                "cnn_embedding": query_cnn_embedding,
+                "web_matches": web_matches,
+            },
+            headers=internal_auth_headers(),
+        )
+        response.raise_for_status()
+        return response.json()

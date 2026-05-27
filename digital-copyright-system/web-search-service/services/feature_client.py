@@ -1,5 +1,6 @@
-import httpx  # Library HTTP async
+﻿import httpx  # Library HTTP async
 from config.settings import config  # Import konfigurasi
+from utils.internal_auth import internal_auth_headers
 from utils.logger import logger  # Import logger
 
 FEATURE_SERVICE_URL = config["feature_service_url"]  # URL feature extraction service
@@ -15,7 +16,8 @@ async def get_embedding(image_bytes):  # Fungsi untuk meminta embedding ke featu
     async with httpx.AsyncClient(timeout=timeout) as client:  # Membuat HTTP client async
         response = await client.post(  # Request POST ke feature extraction
             FEATURE_SERVICE_URL,  # URL endpoint /extract
-            files=files  # File yang dikirim
+            files=files,  # File yang dikirim
+            headers=internal_auth_headers()
         )  # Menutup request POST
 
         response.raise_for_status()  # Lempar error jika status bukan 2xx
@@ -25,3 +27,4 @@ async def get_embedding(image_bytes):  # Fungsi untuk meminta embedding ke featu
         logger.info("Feature embedding received from feature-service")  # Log sukses
 
         return result  # Return seluruh response: status, clip_embedding, cnn_embedding
+
