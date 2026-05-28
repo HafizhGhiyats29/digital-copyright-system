@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class MetadataBase(BaseModel):
+    check_id: Optional[str] = Field(default=None, description="ID hasil pengecekan plagiarisme yang menghasilkan metadata ini")
     ki_id: Optional[str] = Field(default=None, description="ID KI dari dataset sumber jika tersedia")
     ki_uuid: Optional[str] = Field(default=None, description="UUID KI dari dataset sumber jika tersedia")
     title: str = Field(..., min_length=1, description="Judul karya")
@@ -26,6 +27,7 @@ class MetadataCreate(MetadataBase):
 
 
 class MetadataUpdate(BaseModel):
+    check_id: Optional[str] = None
     ki_id: Optional[str] = None
     ki_uuid: Optional[str] = None
     title: Optional[str] = Field(default=None, min_length=1)

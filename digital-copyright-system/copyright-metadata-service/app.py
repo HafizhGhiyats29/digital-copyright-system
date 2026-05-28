@@ -9,6 +9,7 @@ from models.metadata_model import (
 )
 from utils.internal_auth import require_internal_api_key
 from services.metadata_store import (
+    DuplicateMetadataError,
     check_storage_health,
     create_metadata,
     delete_metadata,
@@ -56,7 +57,13 @@ def migrate_json_metadata_to_mongodb():
     dependencies=[Depends(require_internal_api_key)],
 )
 def create(data: MetadataCreate):
-    return create_metadata(data.model_dump())
+    try:
+        return create_metadata(data.model_dump(exclude_none=True))
+    except DuplicateMetadataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
 
 @app.get("/metadata", response_model=list[MetadataResponse])

@@ -1,435 +1,165 @@
 # Digital Copyright System
 
-Digital Copyright System adalah sistem microservice berbasis FastAPI untuk membantu mengecek kemiripan gambar karya sebelum metadata hak cipta didaftarkan. Sistem ini mengekstrak embedding gambar memakai CLIP dan CNN, mencari kandidat gambar dari web, membandingkan kemiripan internal dan eksternal, lalu membuat keputusan apakah karya aman didaftarkan, perlu review manual, atau harus diblokir.
+Digital Copyright System adalah sistem microservice untuk mengecek kemiripan gambar karya sebelum metadata hak cipta didaftarkan. Sistem mengekstrak embedding gambar menggunakan CLIP dan CNN, mencari kandidat kemiripan internal dan eksternal, mengambil keputusan risiko plagiarisme, lalu menyimpan metadata dan embedding karya yang lolos verifikasi.
 
 ## Daftar Isi
 
 - [Fitur Utama](#fitur-utama)
 - [Arsitektur](#arsitektur)
 - [Struktur Folder](#struktur-folder)
-- [Prasyarat](#prasyarat)
+- [Identitas Data](#identitas-data)
+- [Alur Sistem](#alur-sistem)
+- [Validasi Upload](#validasi-upload)
 - [Konfigurasi](#konfigurasi)
-- [Cara Menjalankan Project](#cara-menjalankan-project)
-- [Cara Menggunakan Sistem](#cara-menggunakan-sistem)
-- [Endpoint Penting](#endpoint-penting)
-- [Menjalankan Test](#menjalankan-test)
-- [Dataset dan Evaluasi](#dataset-dan-evaluasi)
-- [Troubleshooting](#troubleshooting)
-- [Workflow Git](#workflow-git)
+- [Menjalankan Dengan Docker](#menjalankan-dengan-docker)
+- [Menjalankan Frontend](#menjalankan-frontend)
+- [Endpoint Utama](#endpoint-utama)
+- [Evaluasi Similarity](#evaluasi-similarity)
+- [Catatan Keamanan](#catatan-keamanan)
 
 ## Fitur Utama
 
-- Upload gambar untuk pengecekan indikasi plagiarisme.
-- Validasi format gambar `JPEG`, `PNG`, dan `WEBP`.
-- Ekstraksi fitur gambar menggunakan:
-  - CLIP embedding.
-  - CNN embedding berbasis ResNet.
-- Reverse image search eksternal lewat SerpAPI dan Cloudinary.
-- Similarity check:
-  - Internal: pencarian vector di Milvus.
-  - Eksternal: cosine similarity terhadap hasil web search.
-- Decision engine dengan preset threshold:
-  - `strict`
-  - `balanced`
-  - `sensitive`
-- Registrasi metadata hanya jika hasil pengecekan aman.
+- Upload gambar untuk cek indikasi plagiarisme.
+- Validasi gambar JPG, PNG, dan WEBP.
+- Ekstraksi fitur gambar:
+  - CLIP embedding untuk konteks visual.
+  - CNN embedding untuk detail visual.
+- Reverse image search eksternal menggunakan SerpAPI.
+- Pencarian internal menggunakan Milvus.
+- Metadata disimpan di MongoDB.
+- Gambar karya disimpan di Cloudinary.
+- Decision engine dengan preset threshold `strict`, `balanced`, dan `sensitive`.
 - Review manual untuk hasil yang berada di area abu-abu.
-- Penyimpanan metadata di MongoDB.
-- Penyimpanan embedding permanen di Milvus.
-- API Gateway sebagai pintu masuk utama aplikasi.
+- Registrasi metadata hanya bisa dilakukan dengan `check_id` hasil pengecekan.
+- Anti-duplikasi registrasi metadata berbasis `check_id`.
+- API Gateway sebagai pintu masuk utama.
 
 ## Arsitektur
 
 ```text
-Client / Swagger
-       |
-       v
+Frontend
+  |
+  v
 API Gateway :8080
-       |
-       v
+  |
+  v
 Upload Service :8000
-       |
-       +--> Feature Extraction Service :8002
-       |       - CLIP embedding
-       |       - CNN embedding
-       |
-       +--> Web Search Service :8001
-       |       - Upload sementara ke Cloudinary
-       |       - Reverse image search via SerpAPI
-       |       - Embedding kandidat web
-       |
-       +--> Similarity Check Service :8003
-       |       - Similarity eksternal
-       |       - Similarity internal ke Milvus :19530
-       |
-       +--> Decision Engine :8005
-       |       - Menentukan allowed / review_required / blocked
-       |
-       +--> Copyright Metadata Service :8006
-               - Simpan metadata ke MongoDB :27017
-               - Simpan referensi vector Milvus
+  |
+  +--> Feature Extraction Service :8002
+  |      - CLIP embedding
+  |      - CNN embedding
+  |
+  +--> Web Search Service :8001
+  |      - Upload sementara ke Cloudinary
+  |      - Reverse image search via SerpAPI
+  |      - Embedding kandidat eksternal
+  |
+  +--> Similarity Check Service :8003
+  |      - Similarity internal ke Milvus
+  |      - Similarity eksternal dengan cosine similarity
+  |
+  +--> Decision Engine :8005
+  |      - Menentukan allowed / review_required / blocked
+  |
+  +--> Copyright Metadata Service :8006
+         - Metadata MongoDB
+         - Referensi vector Milvus
 ```
 
-Alur utama:
+Storage yang digunakan:
 
-```text
-1. User upload gambar.
-2. Upload Service memvalidasi gambar.
-3. Feature Extraction Service membuat CLIP dan CNN embedding.
-4. Web Search Service mencari kandidat gambar serupa dari internet.
-5. Similarity Check Service menghitung kemiripan internal dan eksternal.
-6. Decision Engine menentukan status risiko.
-7. Upload Service mengembalikan check_id dan status registrasi.
-8. Jika aman, user mendaftarkan metadata menggunakan check_id.
-9. Metadata disimpan ke MongoDB dan embedding dipromosikan ke Milvus.
-```
+| Storage | Fungsi |
+|---|---|
+| Cloudinary | Menyimpan file gambar karya |
+| MongoDB | Menyimpan metadata karya |
+| Milvus | Menyimpan embedding CLIP dan CNN |
+| MinIO | Object storage internal untuk Milvus |
 
 ## Struktur Folder
 
 ```text
+Capstone2/
+  README.md
+  digital-copyright-system/
+    api-gateway/
+    upload-service/
+    feature-extraction-service/
+    web-search-service/
+    similarity-check-service/
+    decision-engine/
+    copyright-metadata-service/
+    database/
+      mongodb/
+      milvus/
+    evaluation_dataset/
+    scripts/
+    reports/
+  ../Capstone website/Frontend_CD/
+```
+
+Backend utama berada di:
+
+```text
 digital-copyright-system/
-  api-gateway/                  API utama yang mem-proxy request ke service lain
-  upload-service/               Orchestrator upload, check, review, dan registrasi
-  feature-extraction-service/   Ekstraksi CLIP dan CNN embedding
-  web-search-service/           Reverse image search via Cloudinary + SerpAPI
-  similarity-check-service/     Similarity internal Milvus dan eksternal cosine
-  decision-engine/              Penentuan status risiko berdasarkan score
-  copyright-metadata-service/   CRUD metadata hak cipta
-  database/
-    mongodb/                    Docker Compose dan data MongoDB
-    milvus/                     Docker Compose dan volume Milvus
-    internal_images/            Gambar internal untuk indexing/evaluasi
-  evaluation_dataset/           Dataset evaluasi similarity
-  scripts/                      Script evaluasi
-  reports/                      Hasil laporan evaluasi
 ```
 
-## Prasyarat
-
-Install dulu software berikut:
-
-- Python 3.11 atau lebih baru.
-- Docker Desktop.
-- Git.
-- PowerShell atau CMD.
-- Koneksi internet saat pertama kali menjalankan model karena `transformers`, `torch`, dan model CLIP dapat melakukan download model.
-- Akun/API key:
-  - SerpAPI untuk reverse image search.
-  - Cloudinary untuk upload gambar sementara/permanen.
-
-Catatan untuk GPU:
-
-- `feature-extraction-service/config/settings.yaml` memakai `device: "cuda"`.
-- Jika komputer tidak memiliki CUDA/GPU NVIDIA, ubah menjadi:
-
-```yaml
-device: "cpu"
-```
-
-## Konfigurasi
-
-Konfigurasi service berada di file `config/settings.yaml` masing-masing service.
-
-### Port Service
-
-| Service | Port | Swagger |
-| --- | ---: | --- |
-| API Gateway | 8080 | `http://localhost:8080/docs` |
-| Upload Service | 8000 | `http://localhost:8000/docs` |
-| Web Search Service | 8001 | `http://localhost:8001/docs` |
-| Feature Extraction Service | 8002 | `http://localhost:8002/docs` |
-| Similarity Check Service | 8003 | `http://localhost:8003/docs` |
-| Decision Engine | 8005 | `http://localhost:8005/docs` |
-| Copyright Metadata Service | 8006 | `http://localhost:8006/docs` |
-| MongoDB | 27017 | - |
-| Milvus | 19530 | - |
-| Milvus Health | 9091 | `http://localhost:9091/healthz` |
-| MinIO Console Milvus | 9001 | `http://localhost:9001` |
-
-### Credential Eksternal
-
-Credential Cloudinary dan SerpAPI saat ini dibaca dari:
+Frontend berada di:
 
 ```text
-digital-copyright-system/web-search-service/config/settings.yaml
-digital-copyright-system/upload-service/config/settings.yaml
+E:\Hafizh Code\Capstone website\Frontend_CD
 ```
 
-Pastikan isi credential sesuai akun sendiri. Jangan push API key asli ke repository publik.
+## Identitas Data
 
-Contoh field yang perlu dicek:
+| Field | Fungsi |
+|---|---|
+| `check_id` | ID hasil pengecekan plagiarisme. Dipakai sebagai tiket sekali pakai untuk registrasi metadata. |
+| `id` | ID internal metadata. Dipakai untuk CRUD metadata. |
+| `milvus_id` | ID vector/row embedding di Milvus. |
+| `ki_id` / `ki_uuid` | Referensi opsional untuk database KI resmi di masa depan. Tidak ditampilkan di frontend dan tidak wajib dikirim. |
 
-```yaml
-serpapi_key: "ISI_SERPAPI_KEY_ANDA"
+Catatan penting:
 
-cloudinary:
-  cloud_name: "ISI_CLOUD_NAME"
-  api_key: "ISI_API_KEY"
-  api_secret: "ISI_API_SECRET"
-```
+- `check_id` mencegah satu hasil pengecekan didaftarkan berkali-kali.
+- `id` tidak cocok untuk anti-duplikasi karena selalu dibuat baru saat metadata dibuat.
+- `ki_id` dan `ki_uuid` tidak dipakai dulu karena sumbernya dari database eksternal.
 
-### MongoDB
+## Alur Sistem
 
-Metadata service membaca konfigurasi MongoDB dari:
+### 1. Cek Plagiarisme
 
 ```text
-digital-copyright-system/copyright-metadata-service/config/settings.yaml
+User upload gambar
+  -> Upload Service membuat check_id
+  -> Feature Extraction membuat CLIP dan CNN embedding
+  -> Web Search mencari kandidat eksternal
+  -> Similarity Check mencari kandidat internal dan eksternal
+  -> Decision Engine menentukan status
+  -> Response dikirim ke frontend
 ```
 
-Default:
-
-```yaml
-mongodb:
-  uri: "mongodb://localhost:27017"
-```
-
-Environment variable yang didukung:
-
-```text
-MONGODB_URI
-MONGODB_DATABASE
-MONGODB_COLLECTION
-```
-
-### Milvus
-
-Similarity service membaca konfigurasi Milvus dari:
-
-```text
-digital-copyright-system/similarity-check-service/config/settings.yaml
-```
-
-Default:
-
-```yaml
-milvus_host: "localhost"
-milvus_port: "19530"
-milvus_collection_name: "copyright_embeddings"
-```
-
-## Cara Menjalankan Project
-
-Masuk ke folder project utama:
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system"
-```
-
-### 1. Jalankan MongoDB
-
-Buka terminal pertama:
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\database\mongodb"
-docker compose up -d
-```
-
-Cek container:
-
-```powershell
-docker ps
-```
-
-MongoDB harus berjalan di port `27017`.
-
-### 2. Jalankan Milvus
-
-Buka terminal kedua:
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\database\milvus"
-docker compose up -d
-```
-
-Cek health Milvus:
-
-```powershell
-curl http://localhost:9091/healthz
-```
-
-Tunggu sampai Milvus benar-benar sehat sebelum menjalankan similarity service.
-
-### 3. Buat Virtual Environment Tiap Service
-
-Setiap service punya dependency sendiri. Jalankan per service:
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\nama-service"
-python -m venv venv
-.\venv\Scripts\activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-Ulangi untuk service berikut:
-
-```text
-api-gateway
-upload-service
-feature-extraction-service
-web-search-service
-similarity-check-service
-decision-engine
-copyright-metadata-service
-```
-
-Jika folder `venv` sudah ada dan dependency sudah terinstall, cukup aktifkan saja:
-
-```powershell
-.\venv\Scripts\activate
-```
-
-### 4. Jalankan Semua Service
-
-Buka terminal terpisah untuk setiap service.
-
-#### Terminal 1 - Metadata Service
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\copyright-metadata-service"
-.\venv\Scripts\activate
-python -m uvicorn app:app --reload --host 0.0.0.0 --port 8006
-```
-
-#### Terminal 2 - Feature Extraction Service
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\feature-extraction-service"
-.\venv\Scripts\activate
-python -m uvicorn app:app --reload --host 0.0.0.0 --port 8002
-```
-
-#### Terminal 3 - Web Search Service
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\web-search-service"
-.\venv\Scripts\activate
-python -m uvicorn app:app --reload --host 0.0.0.0 --port 8001
-```
-
-#### Terminal 4 - Similarity Check Service
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\similarity-check-service"
-.\venv\Scripts\activate
-python -m uvicorn app:app --reload --host 0.0.0.0 --port 8003
-```
-
-#### Terminal 5 - Decision Engine
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\decision-engine"
-.\venv\Scripts\activate
-python -m uvicorn app:app --reload --host 0.0.0.0 --port 8005
-```
-
-#### Terminal 6 - Upload Service
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\upload-service"
-.\venv\Scripts\activate
-python -m uvicorn app:app --reload --host 0.0.0.0 --port 8000
-```
-
-#### Terminal 7 - API Gateway
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\api-gateway"
-.\venv\Scripts\activate
-python -m uvicorn app:app --reload --host 0.0.0.0 --port 8080
-```
-
-Setelah semua service hidup, buka:
-
-```text
-http://localhost:8080/docs
-```
-
-### 5. Cek Health Service
-
-```powershell
-curl http://localhost:8080/health
-curl http://localhost:8000/health
-curl http://localhost:8001/health
-curl http://localhost:8002/health
-curl http://localhost:8003/health
-curl http://localhost:8005/health
-curl http://localhost:8006/health
-```
-
-## Setup Milvus Collection
-
-Sebelum embedding disimpan permanen, collection Milvus perlu dibuat.
-
-Jalankan setelah Milvus dan dependency similarity service siap:
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\similarity-check-service"
-.\venv\Scripts\activate
-python .\scripts\create_milvus_collection.py
-```
-
-Jika ingin memasukkan gambar internal dari `database/internal_images`:
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\similarity-check-service"
-.\venv\Scripts\activate
-python .\scripts\insert_internal_images.py
-```
-
-Pastikan `feature-extraction-service` sudah berjalan di port `8002` sebelum menjalankan script insert internal images.
-
-## Cara Menggunakan Sistem
-
-Gunakan API Gateway sebagai pintu masuk utama:
-
-```text
-http://localhost:8080/docs
-```
-
-### 1. Upload Gambar Untuk Dicek
-
-Endpoint:
-
-```text
-POST /api/v1/upload
-```
-
-Di Swagger:
-
-1. Buka `http://localhost:8080/docs`.
-2. Pilih endpoint `POST /api/v1/upload`.
-3. Klik `Try it out`.
-4. Upload file gambar pada field `file`.
-5. Isi `preset` jika perlu:
-   - `strict`
-   - `balanced`
-   - `sensitive`
-6. Klik `Execute`.
-
-Response penting:
-
-```json
-{
-  "status": "processed",
-  "check_id": "uuid-hasil-cek",
-  "can_register": true,
-  "registration_status": "allowed",
-  "registration_reason": "Registrasi diizinkan karena tidak ada indikasi plagiarisme yang perlu ditinjau."
-}
-```
-
-Arti `registration_status`:
+Status registrasi:
 
 | Status | Arti |
-| --- | --- |
-| `allowed` | Gambar aman untuk didaftarkan. |
-| `review_required` | Gambar belum boleh didaftarkan sebelum reviewer approve. |
-| `blocked` | Gambar ditolak karena kemiripan tinggi. |
+|---|---|
+| `allowed` | Metadata boleh didaftarkan |
+| `review_required` | Perlu review manual |
+| `blocked` | Metadata tidak boleh didaftarkan |
 
-### 2. Registrasi Metadata Setelah Aman
+### 2. Review Manual
 
-Jika `can_register = true`, lanjutkan ke:
+Jika status `review_required`, reviewer bisa memilih:
+
+```text
+POST /api/v1/review-check/{check_id}/approve
+POST /api/v1/review-check/{check_id}/reject
+```
+
+Jika disetujui, `check_id` dapat dipakai untuk registrasi metadata.
+
+### 3. Registrasi Metadata
+
+Registrasi metadata dilakukan melalui:
 
 ```text
 POST /api/v1/register-metadata
@@ -440,71 +170,138 @@ Contoh body:
 ```json
 {
   "check_id": "uuid-hasil-cek",
-  "ki_id": "4686",
-  "ki_uuid": "HCNA1506232226",
   "title": "Judul Karya",
   "description": "Deskripsi karya",
   "category": "HAK CIPTA",
-  "sub_category": "Karya Seni",
-  "copyright_category": "Karya Seni",
-  "copyright_sub_category": "Seni Ilustrasi",
-  "image_url": null,
-  "cloudinary_public_id": null
+  "sub_category": "karya seni",
+  "copyright_category": "karya seni",
+  "copyright_sub_category": "karya ilustrasi"
 }
 ```
 
-Saat registrasi berhasil:
+Saat berhasil:
 
-- Metadata dibuat di MongoDB.
-- Gambar disimpan ke Cloudinary jika `image_url` belum diberikan.
-- Embedding sementara dari proses upload disimpan permanen ke Milvus.
-- Metadata diupdate dengan referensi `milvus_collection`, `milvus_id`, `embedding_version`, dan `embedding_status`.
+- Metadata disimpan ke MongoDB.
+- Gambar disimpan ke Cloudinary.
+- Embedding sementara dipromosikan ke Milvus.
+- Metadata menyimpan referensi `milvus_collection`, `milvus_id`, `embedding_version`, dan `embedding_status`.
 
-### 3. Review Manual
+Jika `check_id` yang sama digunakan lagi, sistem menolak dengan `409 Conflict`.
 
-Jika hasil upload mengembalikan `review_required`, reviewer dapat memilih:
+## Validasi Upload
 
-```text
-POST /api/v1/review-check/{check_id}/approve
-POST /api/v1/review-check/{check_id}/reject
-```
+Frontend dan backend membatasi upload:
 
-Contoh body approve:
+- Format: JPG, PNG, WEBP.
+- Ukuran maksimal: 10 MB.
+- Backend memvalidasi isi gambar dengan Pillow.
+- Total piksel maksimal: 40 juta piksel.
 
-```json
-{
-  "reason": "Kemiripan hanya pada konsep umum, bukan visual yang sama."
-}
-```
+Validasi frontend hanya untuk pengalaman user. Validasi utama tetap berada di backend.
 
-Setelah `approve`, gunakan `check_id` yang sama untuk `POST /api/v1/register-metadata`.
+## Konfigurasi
 
-### 4. Melihat Metadata
+Gunakan `.env` untuk secret dan konfigurasi environment.
 
-Endpoint:
+File contoh:
 
 ```text
-GET /api/v1/metadata
-GET /api/v1/metadata/{metadata_id}
+digital-copyright-system/.env.example
 ```
 
-### 5. Menghapus Metadata
+Contoh isi:
 
-Endpoint:
+```env
+SERPAPI_KEY=
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+CLOUDINARY_FOLDER=copyright-registrations
+INTERNAL_API_KEY=
+CORS_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+```
+
+Prinsip konfigurasi:
+
+- `settings.yaml` untuk default lokal yang aman masuk Git.
+- `.env` untuk secret dan override environment.
+- Jangan commit `.env` berisi key asli.
+
+## Menjalankan Dengan Docker
+
+Masuk ke folder backend:
+
+```powershell
+cd "E:\Hafizh Code\Capstone2\digital-copyright-system"
+```
+
+Jalankan semua service:
+
+```powershell
+docker compose up -d --build
+```
+
+Rebuild service tertentu setelah perubahan kode:
+
+```powershell
+docker compose up -d --build api-gateway upload-service copyright-metadata-service
+```
+
+Matikan container tanpa menghapus data:
+
+```powershell
+docker compose down
+```
+
+Jangan gunakan ini kecuali ingin menghapus volume/data:
+
+```powershell
+docker compose down -v
+```
+
+API Gateway dapat diakses dari host melalui:
 
 ```text
-DELETE /api/v1/metadata/{metadata_id}
+http://localhost:8080/docs
 ```
 
-Gateway akan mencoba membersihkan:
+Walaupun service berjalan di Docker, browser tetap memakai `localhost`, bukan nama service Docker seperti `api-gateway`.
 
-- Gambar di Cloudinary jika ada `cloudinary_public_id`.
-- Vector di Milvus.
-- Metadata di MongoDB.
+## Menjalankan Frontend
 
-## Endpoint Penting
+Masuk ke folder frontend:
 
-### API Gateway
+```powershell
+cd "E:\Hafizh Code\Capstone website\Frontend_CD"
+```
+
+Pastikan `.env` frontend berisi:
+
+```env
+VITE_API_BASE_URL=http://localhost:8080/api/v1
+```
+
+Install dependency:
+
+```powershell
+npm install
+```
+
+Jalankan frontend:
+
+```powershell
+npm run dev
+```
+
+Build frontend:
+
+```powershell
+npm.cmd run build
+```
+
+Jika PowerShell menolak `npm` karena execution policy, gunakan `npm.cmd`.
+
+## Endpoint Utama
 
 Base URL:
 
@@ -513,201 +310,23 @@ http://localhost:8080
 ```
 
 | Method | Endpoint | Fungsi |
-| --- | --- | --- |
+|---|---|---|
 | GET | `/health` | Health check gateway |
 | POST | `/api/v1/upload` | Upload dan cek plagiarisme |
-| POST | `/api/v1/register-metadata` | Registrasi metadata setelah pengecekan aman |
+| POST | `/api/v1/register-metadata` | Registrasi metadata memakai `check_id` |
 | POST | `/api/v1/review-check/{check_id}/approve` | Approve hasil review manual |
 | POST | `/api/v1/review-check/{check_id}/reject` | Reject hasil review manual |
 | GET | `/api/v1/metadata` | List metadata |
-| POST | `/api/v1/metadata` | Create metadata langsung |
 | GET | `/api/v1/metadata/{metadata_id}` | Detail metadata |
 | PUT | `/api/v1/metadata/{metadata_id}` | Update metadata |
-| PATCH | `/api/v1/metadata/{metadata_id}/embedding` | Update referensi embedding |
-| DELETE | `/api/v1/metadata/{metadata_id}` | Hapus metadata + vector + gambar |
-| DELETE | `/api/v1/metadata/{metadata_id}/vector` | Hapus vector Milvus saja |
+| DELETE | `/api/v1/metadata/{metadata_id}` | Hapus metadata, vector Milvus, dan gambar Cloudinary |
 
-### Upload Service
+## Evaluasi Similarity
 
-Base URL:
-
-```text
-http://localhost:8000
-```
-
-| Method | Endpoint | Fungsi |
-| --- | --- | --- |
-| GET | `/health` | Health check |
-| POST | `/upload` | Orkestrasi pengecekan gambar |
-| POST | `/register-metadata` | Registrasi metadata menggunakan `check_id` |
-| POST | `/review-check/{check_id}/approve` | Approve review |
-| POST | `/review-check/{check_id}/reject` | Reject review |
-| POST | `/cloudinary/delete` | Hapus gambar Cloudinary |
-
-### Feature Extraction Service
-
-Base URL:
-
-```text
-http://localhost:8002
-```
-
-| Method | Endpoint | Fungsi |
-| --- | --- | --- |
-| GET | `/health` | Health check |
-| POST | `/extract` | Ekstraksi CLIP dan CNN embedding dari gambar |
-
-### Web Search Service
-
-Base URL:
-
-```text
-http://localhost:8001
-```
-
-| Method | Endpoint | Fungsi |
-| --- | --- | --- |
-| GET | `/health` | Health check |
-| POST | `/search` | Reverse image search dan embedding kandidat |
-
-### Similarity Check Service
-
-Base URL:
-
-```text
-http://localhost:8003
-```
-
-| Method | Endpoint | Fungsi |
-| --- | --- | --- |
-| GET | `/health` | Health check |
-| POST | `/similarity` | Hitung kemiripan internal dan eksternal |
-| POST | `/embeddings` | Simpan embedding ke Milvus |
-| DELETE | `/embeddings/{metadata_id}` | Hapus embedding berdasarkan metadata ID |
-
-### Decision Engine
-
-Base URL:
-
-```text
-http://localhost:8005
-```
-
-| Method | Endpoint | Fungsi |
-| --- | --- | --- |
-| GET | `/health` | Health check |
-| POST | `/decision` | Buat keputusan risiko dari similarity score |
-
-### Copyright Metadata Service
-
-Base URL:
-
-```text
-http://localhost:8006
-```
-
-| Method | Endpoint | Fungsi |
-| --- | --- | --- |
-| GET | `/health` | Health check |
-| GET | `/` | Info service |
-| POST | `/metadata/migrate-json-to-mongodb` | Migrasi data JSON lokal ke MongoDB |
-| POST | `/metadata` | Create metadata |
-| GET | `/metadata` | List metadata |
-| GET | `/metadata/{metadata_id}` | Detail metadata |
-| PUT | `/metadata/{metadata_id}` | Update metadata |
-| PATCH | `/metadata/{metadata_id}/embedding` | Update referensi embedding |
-| DELETE | `/metadata/{metadata_id}` | Delete metadata |
-
-## Preset Decision Engine
-
-Konfigurasi berada di:
-
-```text
-digital-copyright-system/decision-engine/config/settings.yaml
-```
-
-Default:
-
-| Preset | High | Medium | Low |
-| --- | ---: | ---: | ---: |
-| `strict` | 0.90 | 0.75 | 0.60 |
-| `balanced` | 0.85 | 0.70 | 0.55 |
-| `sensitive` | 0.80 | 0.65 | 0.50 |
-
-Aturan registrasi secara umum:
-
-```text
-high_similarity      -> blocked
-possible_plagiarism  -> review_required
-medium_similarity    -> review_required
-low_similarity       -> allowed
-no_significant       -> allowed
-```
-
-Custom threshold juga bisa dikirim saat upload:
-
-```text
-high_threshold
-medium_threshold
-low_threshold
-```
-
-Jika memakai custom threshold, ketiganya wajib diisi.
-
-## Menjalankan Test
-
-Jalankan test per service dari folder service masing-masing.
-
-Contoh API Gateway:
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\api-gateway"
-.\venv\Scripts\activate
-python -m pytest -q
-```
-
-Contoh Metadata Service:
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\copyright-metadata-service"
-.\venv\Scripts\activate
-python -m pytest -q
-```
-
-Contoh Upload Service:
-
-```powershell
-cd "E:\Hafizh Code\Capstone2\digital-copyright-system\upload-service"
-.\venv\Scripts\activate
-python -m pytest -q
-```
-
-Service yang memiliki folder `tests`:
-
-```text
-api-gateway
-copyright-metadata-service
-feature-extraction-service
-similarity-check-service
-upload-service
-web-search-service
-```
-
-## Dataset dan Evaluasi
-
-Dataset evaluasi ada di:
+Dataset evaluasi berada di:
 
 ```text
 digital-copyright-system/evaluation_dataset
-```
-
-Kategori dataset:
-
-```text
-same
-modified
-semantic_similar
-different
 ```
 
 Script evaluasi:
@@ -716,158 +335,56 @@ Script evaluasi:
 digital-copyright-system/scripts/evaluate_similarity.py
 ```
 
-Contoh menjalankan evaluasi:
+Jalankan:
 
 ```powershell
 cd "E:\Hafizh Code\Capstone2\digital-copyright-system"
-python .\scripts\evaluate_similarity.py --output .\reports\similarity_evaluation.csv
+python .\scripts\evaluate_similarity.py
 ```
 
-Hasil laporan tersimpan di folder:
+Hasil evaluasi berada di:
 
 ```text
-digital-copyright-system/reports
+digital-copyright-system/reports/similarity_evaluation.csv
 ```
 
-## Troubleshooting
+Metrik yang dicatat:
 
-### 1. `ModuleNotFoundError`
+- Accuracy
+- Precision
+- Recall
+- F1
+- True Positive
+- False Positive
+- False Negative
+- True Negative
 
-Pastikan virtual environment service aktif dan dependency sudah diinstall:
+## Catatan Keamanan
 
-```powershell
-.\venv\Scripts\activate
-python -m pip install -r requirements.txt
-```
+- Frontend hanya mengakses API Gateway.
+- Service internal dilindungi header `X-Internal-API-Key`.
+- Direct access ke service internal sebaiknya tidak dibuka ke publik.
+- CORS API Gateway harus dibatasi ke domain frontend.
+- Secret disimpan di `.env`, bukan `settings.yaml`.
+- Untuk user internal, role user belum wajib, tetapi endpoint mutasi tetap lewat gateway.
 
-### 2. Feature extraction gagal karena CUDA
+## Dokumentasi Tambahan
 
-Jika tidak punya GPU CUDA, ubah:
-
-```yaml
-device: "cuda"
-```
-
-menjadi:
-
-```yaml
-device: "cpu"
-```
-
-di:
+Dokumentasi backend lebih detail:
 
 ```text
-feature-extraction-service/config/settings.yaml
+digital-copyright-system/README.md
 ```
 
-### 3. Milvus belum siap
-
-Cek container:
-
-```powershell
-docker ps
-```
-
-Cek health:
-
-```powershell
-curl http://localhost:9091/healthz
-```
-
-Jika belum sehat, tunggu beberapa saat lalu ulangi.
-
-### 4. Similarity service gagal connect Milvus
-
-Pastikan:
-
-- Milvus berjalan di port `19530`.
-- Collection sudah dibuat dengan `create_milvus_collection.py`.
-- Konfigurasi `milvus_host` dan `milvus_port` benar.
-
-### 5. Web search gagal
-
-Pastikan:
-
-- `serpapi_key` valid.
-- Credential Cloudinary valid.
-- Internet aktif.
-- Limit API SerpAPI/Cloudinary belum habis.
-
-### 6. Upload service gagal memanggil service lain
-
-Pastikan semua service berjalan di port sesuai konfigurasi:
+Dokumentasi metadata service:
 
 ```text
-feature_service_url: http://localhost:8002/extract
-web_search_service_url: http://localhost:8001/search
-similarity_service_url: http://localhost:8003/similarity
-decision_service_url: http://localhost:8005/decision
-metadata_service_url: http://localhost:8006/metadata
+digital-copyright-system/copyright-metadata-service/README.md
 ```
 
-### 7. Port sudah dipakai
-
-Cek proses yang memakai port:
-
-```powershell
-netstat -ano | findstr :8080
-```
-
-Ganti `8080` dengan port yang bermasalah.
-
-### 8. Swagger tidak muncul
-
-Pastikan service sudah dijalankan dengan uvicorn dan buka URL sesuai port:
+Dokumentasi frontend:
 
 ```text
-http://localhost:<PORT>/docs
+E:\Hafizh Code\Capstone website\Frontend_CD\README.md
 ```
 
-## Workflow Git
-
-Clone repository:
-
-```powershell
-git clone https://github.com/HafizhGhiyats29/digital-copyright-system.git
-cd digital-copyright-system
-```
-
-Ambil update terbaru:
-
-```powershell
-git pull origin main
-```
-
-Buat branch kerja:
-
-```powershell
-git checkout -b nama-fitur
-```
-
-Cek perubahan:
-
-```powershell
-git status
-```
-
-Commit perubahan:
-
-```powershell
-git add .
-git commit -m "deskripsi perubahan"
-```
-
-Push branch:
-
-```powershell
-git push -u origin nama-fitur
-```
-
-Jika bekerja langsung di branch `main`, pastikan sudah pull update terbaru sebelum push.
-
-## Catatan Penting
-
-- File `digital-copyright-system/docker-compose.yml` utama saat ini kosong. Untuk menjalankan database gunakan compose di `database/mongodb` dan `database/milvus`.
-- Jalankan API lewat API Gateway (`http://localhost:8080/docs`) agar alur antar-service lebih mudah dipakai.
-- Untuk demo lokal tanpa GPU, gunakan `device: "cpu"` pada feature extraction.
-- Jangan menyimpan API key asli di repository publik.

@@ -44,6 +44,14 @@ def _get_env(name: str, default: Any) -> Any:  # Mengambil nilai dari environmen
     return os.getenv(name, default)
 
 
+def _get_list_env(name: str, default: list[str]) -> list[str]:
+    value = os.getenv(name)
+    if value is None:
+        return default
+
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 @dataclass(frozen=True)
 class ServiceConfig:
     name: str
@@ -91,9 +99,10 @@ def load_settings() -> Settings:
         request_timeout_seconds=float(
             _get_env("REQUEST_TIMEOUT_SECONDS", raw.get("request_timeout_seconds", 60))
         ),
-        cors_allow_origins=str(
-            _get_env("CORS_ALLOW_ORIGINS", ",".join(raw.get("cors_allow_origins", ["*"])))
-        ).split(","),
+        cors_allow_origins=_get_list_env(
+            "CORS_ALLOW_ORIGINS",
+            raw.get("cors_allow_origins", ["http://localhost:5173", "http://127.0.0.1:5173"]),
+        ),
         services=services,
         internal_api_key=str(_get_env("INTERNAL_API_KEY", "")),
     )

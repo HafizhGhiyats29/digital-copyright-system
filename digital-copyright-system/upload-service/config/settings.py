@@ -31,6 +31,15 @@ _load_env_file(BASE_DIR / ".env")
 with CONFIG_PATH.open("r", encoding="utf-8") as file:
     config = yaml.safe_load(file) or {}
 
+config["feature_service_url"] = os.getenv("FEATURE_SERVICE_URL", config.get("feature_service_url"))
+config["web_search_service_url"] = os.getenv("WEB_SEARCH_SERVICE_URL", config.get("web_search_service_url"))
+config["similarity_service_url"] = os.getenv("SIMILARITY_SERVICE_URL", config.get("similarity_service_url"))
+config["decision_service_url"] = os.getenv("DECISION_SERVICE_URL", config.get("decision_service_url"))
+config["metadata_service_url"] = os.getenv("METADATA_SERVICE_URL", config.get("metadata_service_url"))
+config["embedding_service_url"] = os.getenv("EMBEDDING_SERVICE_URL", config.get("embedding_service_url"))
+config["max_file_size"] = int(os.getenv("MAX_FILE_SIZE", config.get("max_file_size", 10485760)))
+config["request_timeout"] = int(os.getenv("REQUEST_TIMEOUT", config.get("request_timeout", 20)))
+
 cloudinary_config = config.setdefault("cloudinary", {})
 cloudinary_config["cloud_name"] = os.getenv("CLOUDINARY_CLOUD_NAME", cloudinary_config.get("cloud_name"))
 cloudinary_config["api_key"] = os.getenv("CLOUDINARY_API_KEY", cloudinary_config.get("api_key"))
@@ -41,5 +50,3 @@ WEB_SEARCH_SERVICE_URL = config.get("web_search_service_url")
 MAX_FILE_SIZE = config.get("max_file_size")
 REQUEST_TIMEOUT = config.get("request_timeout")
 FEATURE_SERVICE_URL = config.get("feature_service_url")
-
-

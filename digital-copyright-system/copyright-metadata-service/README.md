@@ -1,13 +1,14 @@
 # Copyright Metadata Service
 
-Service ini menyimpan metadata karya hak cipta dan referensi embedding yang nanti dipakai untuk integrasi Milvus. Untuk tahap sekarang storage masih memakai file JSON lokal di `data/metadata.json`, sehingga service bisa diuji tanpa MongoDB atau Milvus.
+Service ini menyimpan metadata karya hak cipta dan referensi embedding yang dipakai untuk integrasi Milvus. Storage dapat memakai JSON lokal untuk pengujian atau MongoDB untuk mode utama.
 
 ## Peran Service
 
-- Menyimpan metadata karya, seperti judul, deskripsi, kategori, dan URL gambar.
+- Menyimpan metadata karya, seperti `check_id`, judul, deskripsi, kategori, dan URL gambar.
 - Menyimpan referensi ke embedding di Milvus melalui `milvus_collection` dan `milvus_id`.
 - Menyimpan status embedding: `pending`, `ready`, atau `failed`.
 - Menjadi sumber detail metadata saat similarity search mengembalikan ID dari Milvus.
+- Mencegah registrasi ganda dengan `check_id`.
 
 ## Data Model
 
@@ -16,8 +17,7 @@ Field utama metadata:
 ```json
 {
   "id": "uuid-generated-by-service",
-  "ki_id": "4686",
-  "ki_uuid": "HCNA1506232226",
+  "check_id": "uuid-hasil-pengecekan",
   "title": "Serwataka Toguri Sharpie",
   "description": "Deskripsi karya",
   "category": "HAK CIPTA",
@@ -37,7 +37,8 @@ Field utama metadata:
 
 Catatan:
 
-- `ki_id` dan `ki_uuid` bersifat opsional, dipakai jika data berasal dari dataset KI.
+- `check_id` adalah ID hasil pengecekan plagiarisme dan dipakai sebagai anti-duplikasi registrasi.
+- `ki_id` dan `ki_uuid` bersifat opsional untuk integrasi database KI resmi di masa depan.
 - `id` adalah ID utama metadata yang dibuat otomatis oleh service.
 - `milvus_id` adalah ID row/vector di Milvus.
 - Jika satu row Milvus menyimpan `clip_embedding` dan `cnn_embedding`, cukup pakai satu `milvus_id`.
@@ -86,8 +87,7 @@ http://127.0.0.1:8080/docs
 
 ```json
 {
-  "ki_id": "4686",
-  "ki_uuid": "HCNA1506232226",
+  "check_id": "uuid-hasil-pengecekan",
   "title": "Serwataka Toguri Sharpie",
   "description": "Contoh deskripsi karya",
   "category": "HAK CIPTA",
@@ -176,8 +176,6 @@ Body:
 ```json
 {
   "check_id": "uuid-hasil-cek",
-  "ki_id": "4686",
-  "ki_uuid": "HCNA1506232226",
   "title": "Serwataka Toguri Sharpie",
   "description": "Contoh deskripsi karya",
   "category": "HAK CIPTA",

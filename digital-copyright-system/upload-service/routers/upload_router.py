@@ -20,6 +20,8 @@ import uuid  # Import uuid untuk request id
 
 router = APIRouter()  # Membuat router FastAPI
 
+ALLOWED_UPLOAD_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}  # MIME type gambar yang diterima
+
 
 class RegisterMetadataRequest(BaseModel):  # Request registrasi metadata setelah upload/check aman
     check_id: str = Field(..., description="ID hasil pengecekan dari endpoint upload")
@@ -96,7 +98,7 @@ async def register_metadata(data: RegisterMetadataRequest):
             },
         )
 
-    metadata_payload = data.model_dump(exclude={"check_id"})  # Hilangkan check_id sebelum kirim ke metadata service
+    metadata_payload = data.model_dump(exclude_none=True)  # Simpan check_id dan abaikan field optional kosong
     cloudinary_public_id = None  # Dipakai untuk rollback jika create metadata gagal
 
     if not metadata_payload.get("image_url") and temporary_check.get("file_bytes") is not None:
@@ -260,9 +262,9 @@ async def upload_image(  # Fungsi menerima upload gambar dan threshold
 
     logger.info(f"[{request_id}] Upload request received")  # Log request diterima
 
-    if file.content_type not in ["image/jpeg", "image/png", "image/webp"]:  # Validasi tipe file
+    if file.content_type not in ALLOWED_UPLOAD_CONTENT_TYPES:  # Validasi tipe file dari request
         logger.warning(f"[{request_id}] Unsupported file type: {file.content_type}")  # Log tipe file tidak didukung
-        raise HTTPException(status_code=400, detail="Format gambar tidak didukung")  # Return error 400
+        raise HTTPException(status_code=400, detail="Format gambar harus JPG, PNG, atau WEBP")  # Return error 400
 
     file_bytes = await file.read()  # Membaca file menjadi bytes
 
@@ -273,7 +275,11 @@ async def upload_image(  # Fungsi menerima upload gambar dan threshold
         logger.warning(f"[{request_id}] File too large")  # Log file terlalu besar
         raise HTTPException(status_code=400, detail="File terlalu besar")  # Return error 400
 
-    validate_image(file_bytes)  # Validasi isi gambar
+    try:
+        validate_image(file_bytes)  # Validasi isi gambar
+    except ValueError as exc:
+        logger.warning(f"[{request_id}] Invalid image content: {exc}")  # Log gambar tidak valid
+        raise HTTPException(status_code=400, detail=str(exc)) from exc  # Return error validasi gambar
 
     logger.info(f"[{request_id}] Image validation passed")  # Log gambar valid
 

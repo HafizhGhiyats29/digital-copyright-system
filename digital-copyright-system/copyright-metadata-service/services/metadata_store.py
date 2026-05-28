@@ -9,7 +9,7 @@ from uuid import uuid4
 import yaml
 from pymongo import ASCENDING, MongoClient, ReturnDocument
 from pymongo.collection import Collection
-from pymongo.errors import PyMongoError
+from pymongo.errors import DuplicateKeyError, PyMongoError
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -19,6 +19,10 @@ DATA_PATH = DATA_DIR / "metadata.json"
 _lock = Lock()
 _mongo_client: MongoClient | None = None
 _mongo_collection: Collection | None = None
+
+
+class DuplicateMetadataError(ValueError):
+    pass
 
 
 def _load_settings() -> dict:
@@ -88,6 +92,11 @@ def _get_mongo_collection() -> Collection:
     _mongo_client.admin.command("ping")
     _mongo_collection = _mongo_client[mongo["database"]][mongo["collection"]]
     _mongo_collection.create_index([("id", ASCENDING)], unique=True)
+    _mongo_collection.create_index(
+        [("check_id", ASCENDING)],
+        unique=True,
+        partialFilterExpression={"check_id": {"$type": "string"}},
+    )
     _mongo_collection.create_index([("ki_uuid", ASCENDING)])
     _mongo_collection.create_index([("milvus_id", ASCENDING)])
     _mongo_collection.create_index([("embedding_status", ASCENDING)])
@@ -106,6 +115,11 @@ def _normalize_mongo_item(item: Optional[dict]) -> Optional[dict]:
 def _create_metadata_json(data: dict) -> dict:
     with _lock:
         items = _read_all_json()
+        check_id = data.get("check_id")
+
+        if check_id and any(item.get("check_id") == check_id for item in items):
+            raise DuplicateMetadataError("Check ID sudah pernah digunakan untuk registrasi metadata")
+
         now = _now_iso()
         item = {
             "id": str(uuid4()),
@@ -166,7 +180,13 @@ def _create_metadata_mongo(data: dict) -> dict:
         "created_at": now,
         "updated_at": now,
     }
-    collection.insert_one(item)
+    try:
+        collection.insert_one(item)
+    except DuplicateKeyError as exc:
+        if data.get("check_id"):
+            raise DuplicateMetadataError("Check ID sudah pernah digunakan untuk registrasi metadata") from exc
+        raise
+
     return item
 
 

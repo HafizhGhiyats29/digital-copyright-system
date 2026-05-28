@@ -31,11 +31,12 @@ _load_env_file(BASE_DIR / ".env")
 with CONFIG_PATH.open("r", encoding="utf-8") as file:
     config = yaml.safe_load(file) or {}
 
+config["feature_service_url"] = os.getenv("FEATURE_SERVICE_URL", config.get("feature_service_url"))
+config["request_timeout"] = int(os.getenv("REQUEST_TIMEOUT", config.get("request_timeout", 20)))
+
 cloudinary_config = config.setdefault("cloudinary", {})
 cloudinary_config["cloud_name"] = os.getenv("CLOUDINARY_CLOUD_NAME", cloudinary_config.get("cloud_name"))
 cloudinary_config["api_key"] = os.getenv("CLOUDINARY_API_KEY", cloudinary_config.get("api_key"))
 cloudinary_config["api_secret"] = os.getenv("CLOUDINARY_API_SECRET", cloudinary_config.get("api_secret"))
 
 config["serpapi_key"] = os.getenv("SERPAPI_KEY", config.get("serpapi_key"))
-
-
