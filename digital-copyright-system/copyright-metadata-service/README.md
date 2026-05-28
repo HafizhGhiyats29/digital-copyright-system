@@ -249,3 +249,120 @@ Ekspektasi hasil:
 ```
 
 Test memakai file JSON sementara di folder `tests`, sehingga tidak mengubah `data/metadata.json`.
+# Copyright Metadata Service - Panduan Memahami Kode
+
+Service ini menyimpan data metadata karya cipta. Metadata disimpan di MongoDB, sedangkan gambar disimpan di Cloudinary dan embedding disimpan di Milvus. Service ini menyimpan referensi ke keduanya.
+
+## Tanggung Jawab Utama
+
+- Menyediakan CRUD metadata.
+- Menyimpan metadata ke MongoDB.
+- Mendukung fallback storage JSON untuk development.
+- Menyimpan referensi Cloudinary.
+- Menyimpan referensi vector Milvus.
+- Mencegah duplikasi metadata berdasarkan `check_id`.
+- Menyediakan endpoint update status embedding.
+
+## File Penting
+
+### `app.py`
+
+Entry point FastAPI metadata service.
+
+Endpoint penting:
+- `POST /metadata`: membuat metadata.
+- `GET /metadata`: mengambil daftar metadata.
+- `GET /metadata/{id}`: mengambil metadata detail.
+- `PUT /metadata/{id}`: update metadata.
+- `DELETE /metadata/{id}`: hapus metadata.
+- endpoint embedding update untuk mengisi `milvus_collection`, `milvus_id`, dan `embedding_status`.
+
+Alasannya:
+- Metadata service hanya fokus pada data deskriptif.
+- Operasi Cloudinary dan Milvus biasanya diorkestrasi oleh upload service atau API Gateway.
+
+### `models/metadata_model.py`
+
+Berisi schema Pydantic untuk metadata.
+
+Field penting:
+- `id`: ID internal metadata.
+- `check_id`: ID hasil pengecekan plagiarisme.
+- `title`, `description`, dan kategori karya.
+- `image_url`: URL gambar dari Cloudinary.
+- `cloudinary_public_id`: ID file di Cloudinary.
+- `milvus_collection`: nama collection vector.
+- `milvus_id`: ID vector di Milvus.
+- `embedding_version`: versi embedding.
+- `embedding_status`: status embedding, misalnya `pending` atau `ready`.
+
+Catatan:
+- `ki_id` dan `ki_uuid` dibuat opsional karena saat ini berasal dari sistem lain dan belum menjadi sumber utama.
+- Untuk data baru, sistem bisa berjalan tanpa dua field tersebut.
+
+Alasannya:
+- Metadata harus tetap bisa dibuat walaupun belum terhubung dengan sistem KI eksternal.
+- Field referensi vector dan object storage membuat metadata bisa menghubungkan MongoDB, Milvus, dan Cloudinary.
+
+### `services/metadata_store.py`
+
+Berisi logic penyimpanan metadata.
+
+Tugas utama:
+- koneksi ke MongoDB,
+- membuat index,
+- menyimpan metadata,
+- mengambil daftar metadata,
+- update metadata,
+- delete metadata,
+- fallback ke JSON jika mode development membutuhkan,
+- mengecek duplikasi berdasarkan `check_id`.
+
+Alasannya:
+- Semua akses storage dikumpulkan di satu file.
+- Jika nanti storage diganti atau dioptimasi, router tidak perlu banyak berubah.
+
+Duplikasi:
+- `check_id` dipakai agar satu hasil cek plagiarisme tidak bisa dipakai berkali-kali untuk membuat metadata.
+- Jika `check_id` sudah ada, service mengembalikan error conflict.
+
+### `utils/metrics.py`
+
+Berisi helper metric sederhana.
+
+Alasannya:
+- Berguna untuk observability dasar.
+- Bisa diperluas jika nanti service memakai monitoring.
+
+### `utils/internal_auth.py`
+
+Memvalidasi internal API key.
+
+Alasannya:
+- Metadata service tidak seharusnya dipanggil sembarang client secara langsung.
+- Service internal seperti API Gateway dan upload service harus membawa API key yang benar.
+
+## Alur Registrasi Metadata
+
+1. User melakukan cek plagiarisme melalui upload service.
+2. Upload service mendapat `check_id`.
+3. Jika hasil aman, user mengisi metadata.
+4. Upload service mengirim metadata ke service ini.
+5. Metadata disimpan ke MongoDB.
+6. Upload service menyimpan embedding ke Milvus.
+7. Metadata di-update dengan `milvus_id` dan `embedding_status = ready`.
+
+## Alasan MongoDB Dipakai
+
+MongoDB cocok untuk metadata karena:
+
+- struktur dokumen fleksibel,
+- field metadata dapat berkembang,
+- mudah menyimpan data nested atau optional,
+- cocok untuk CRUD administratif.
+
+Milvus tidak dipakai untuk metadata karena Milvus fokus pada pencarian vector, bukan data deskriptif.
+
+## Catatan Desain
+
+Service ini tidak menyimpan file gambar dan tidak menghitung embedding. Tugasnya adalah menjadi sumber kebenaran untuk data metadata karya. File gambar berada di Cloudinary, sedangkan vector berada di Milvus.

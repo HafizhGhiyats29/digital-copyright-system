@@ -25,6 +25,18 @@ Peran penyimpanan:
 - Milvus: menyimpan embedding CLIP dan CNN.
 - MinIO: object storage internal untuk Milvus.
 
+## Panduan Kode Per Service
+
+Setiap service memiliki README sendiri yang menjelaskan fungsi file, alur logika, dan alasan desain kodenya:
+
+- `api-gateway/README.md`: proxy, CORS, internal API key, dan cleanup lintas-service.
+- `upload-service/README.md`: orkestrasi upload, pengecekan plagiarisme, review manual, dan registrasi metadata.
+- `feature-extraction-service/README.md`: preprocessing gambar serta ekstraksi embedding CLIP dan CNN.
+- `web-search-service/README.md`: pencarian kandidat eksternal dari web.
+- `similarity-check-service/README.md`: cosine similarity, Milvus, dan penggabungan skor internal/eksternal.
+- `decision-engine/README.md`: preset threshold, score rules, dan keputusan registrasi.
+- `copyright-metadata-service/README.md`: CRUD metadata, MongoDB, anti-duplikasi `check_id`, dan referensi Cloudinary/Milvus.
+
 ## Alur Cek dan Registrasi
 
 1. User upload gambar dari frontend.
@@ -141,4 +153,3 @@ CORS_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 - Service internal dilindungi `X-Internal-API-Key`.
 - Mutasi metadata, review, upload embedding, dan delete dilakukan melalui gateway/service internal.
 - Untuk deployment publik, batasi `CORS_ALLOW_ORIGINS` ke domain frontend yang benar.
-
