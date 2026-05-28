@@ -1,6 +1,6 @@
 # Digital Copyright System
 
-Digital Copyright System adalah sistem microservice untuk mengecek kemiripan gambar karya sebelum metadata hak cipta didaftarkan. Sistem mengekstrak embedding gambar menggunakan CLIP dan CNN, mencari kandidat kemiripan internal dan eksternal, mengambil keputusan risiko plagiarisme, lalu menyimpan metadata dan embedding karya yang lolos verifikasi.
+Digital Copyright System adalah sistem microservice untuk mengecek kemiripan gambar karya sebelum metadata hak cipta didaftarkan. Sistem mengekstrak embedding gambar menggunakan CLIP dan CNN, mencari kandidat kemiripan internal dan eksternal, mengambil keputusan risiko plagiarisme, lalu menyimpan metadata dan embedding karya yang lolos .
 
 ## Daftar Isi
 
