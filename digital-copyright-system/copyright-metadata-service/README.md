@@ -366,3 +366,328 @@ Milvus tidak dipakai untuk metadata karena Milvus fokus pada pencarian vector, b
 ## Catatan Desain
 
 Service ini tidak menyimpan file gambar dan tidak menghitung embedding. Tugasnya adalah menjadi sumber kebenaran untuk data metadata karya. File gambar berada di Cloudinary, sedangkan vector berada di Milvus.
+
+## Penjelasan Kode Per Fungsi
+
+### `app.py`
+
+#### `health()`
+
+Endpoint health check.
+
+Alasannya:
+- memastikan metadata service aktif.
+
+#### `root()`
+
+Endpoint root sederhana.
+
+Biasanya dipakai untuk cek manual bahwa service dapat diakses.
+
+#### `migrate_json_metadata_to_mongodb()`
+
+Endpoint migrasi dari storage JSON ke MongoDB.
+
+Alur:
+1. Membaca metadata dari JSON.
+2. Memasukkan data ke MongoDB.
+3. Mengembalikan ringkasan migrasi.
+
+Alasannya:
+- awal development bisa memakai JSON;
+- saat siap, data bisa dipindahkan ke MongoDB.
+
+#### `create(data: MetadataCreate)`
+
+Membuat metadata baru.
+
+Alur:
+1. Validasi body dengan `MetadataCreate`.
+2. Kirim data ke `create_metadata`.
+3. Jika `check_id` duplikat, return conflict.
+4. Return metadata yang sudah dibuat.
+
+Alasannya:
+- metadata baru harus melewati service store agar storage JSON/MongoDB tetap konsisten.
+
+#### `read_all()`
+
+Mengambil semua metadata.
+
+#### `read_by_id(metadata_id: str)`
+
+Mengambil satu metadata berdasarkan ID.
+
+Jika tidak ditemukan:
+- return 404.
+
+#### `update(metadata_id: str, data: MetadataUpdate)`
+
+Update metadata parsial.
+
+Alur:
+1. Ambil field yang dikirim saja.
+2. Jika body kosong, return 400.
+3. Update data di storage.
+4. Jika ID tidak ditemukan, return 404.
+
+Alasannya:
+- update tidak wajib mengirim semua field.
+- body kosong dianggap request tidak valid.
+
+#### `update_embedding_reference(metadata_id: str, data: EmbeddingReferenceUpdate)`
+
+Mengupdate referensi Milvus pada metadata.
+
+Field yang biasanya diupdate:
+- `milvus_collection`;
+- `milvus_id`;
+- `embedding_version`;
+- `embedding_status`.
+
+Alasannya:
+- metadata dibuat lebih dulu;
+- embedding disimpan ke Milvus setelah metadata punya ID;
+- referensi vector perlu ditulis kembali ke metadata.
+
+#### `delete(metadata_id: str)`
+
+Menghapus metadata berdasarkan ID.
+
+Catatan:
+- endpoint ini hanya menghapus metadata;
+- cleanup Cloudinary dan Milvus biasanya diorkestrasi oleh API Gateway.
+
+### `models/metadata_model.py`
+
+#### `MetadataBase`
+
+Schema dasar metadata.
+
+Berisi field umum seperti:
+- `check_id`;
+- `title`;
+- `description`;
+- kategori;
+- `image_url`;
+- `cloudinary_public_id`;
+- referensi Milvus.
+
+Alasannya:
+- field yang sama bisa dipakai oleh create dan response.
+
+#### `MetadataCreate`
+
+Schema untuk create metadata.
+
+Turunan dari `MetadataBase`.
+
+Alasannya:
+- request create memakai struktur dasar metadata.
+
+#### `MetadataUpdate`
+
+Schema untuk update parsial.
+
+Semua field opsional.
+
+Alasannya:
+- user dapat mengubah satu atau beberapa field saja.
+
+#### `EmbeddingReferenceUpdate`
+
+Schema khusus update referensi embedding.
+
+Alasannya:
+- update embedding punya kebutuhan khusus dan tidak perlu membuka semua field metadata.
+
+#### `MetadataResponse`
+
+Schema response metadata.
+
+Tambahan:
+- `id`;
+- `created_at`;
+- `updated_at`.
+
+Alasannya:
+- response perlu membawa field hasil generate dari sistem.
+
+### `services/metadata_store.py`
+
+#### `DuplicateMetadataError`
+
+Error khusus ketika `check_id` sudah pernah dipakai.
+
+Alasannya:
+- satu hasil cek plagiarisme tidak boleh membuat banyak metadata.
+
+#### `_load_settings()`
+
+Membaca konfigurasi metadata service.
+
+#### `_storage_type()`
+
+Menentukan storage aktif: JSON atau MongoDB.
+
+Alasannya:
+- service bisa fleksibel untuk development dan production.
+
+#### `_now_iso()`
+
+Menghasilkan timestamp ISO.
+
+Dipakai untuk:
+- `created_at`;
+- `updated_at`.
+
+#### `_ensure_store()`
+
+Memastikan file/folder JSON store tersedia.
+
+Alasannya:
+- fallback JSON tidak error saat file belum ada.
+
+#### `_read_all_json()` dan `_write_all_json(items)`
+
+Membaca dan menulis semua metadata pada storage JSON.
+
+Alasannya:
+- mode JSON sederhana dan cocok untuk development awal.
+
+#### `_mongo_settings()`
+
+Mengambil konfigurasi MongoDB.
+
+#### `_get_mongo_collection()`
+
+Membuka collection MongoDB dan memastikan index penting tersedia.
+
+Index penting:
+- unique index untuk `id`;
+- partial unique index untuk `check_id`.
+
+Alasannya:
+- `id` harus unik;
+- `check_id` mencegah duplikasi registrasi.
+
+#### `_normalize_mongo_item(item)`
+
+Membersihkan item MongoDB sebelum dikirim sebagai response.
+
+Biasanya:
+- menghapus atau mengubah `_id` ObjectId agar JSON serializable.
+
+#### `_create_metadata_json(data)`
+
+Membuat metadata di JSON store.
+
+Logika:
+- cek duplikasi `check_id`;
+- generate `id`;
+- isi timestamp;
+- simpan ke file JSON.
+
+#### `_get_all_metadata_json()`
+
+Mengambil semua metadata dari JSON.
+
+#### `_get_metadata_by_id_json(metadata_id)`
+
+Mengambil metadata dari JSON berdasarkan ID.
+
+#### `_update_metadata_json(metadata_id, data)`
+
+Update metadata JSON.
+
+Logika:
+- cari item berdasarkan ID;
+- merge field baru;
+- update `updated_at`;
+- tulis ulang file.
+
+#### `_delete_metadata_json(metadata_id)`
+
+Menghapus metadata dari JSON.
+
+#### `_create_metadata_mongo(data)`
+
+Membuat metadata di MongoDB.
+
+Logika:
+- cek duplikasi `check_id`;
+- generate `id`;
+- isi timestamp;
+- insert ke MongoDB.
+
+#### `_get_all_metadata_mongo()`
+
+Mengambil semua metadata dari MongoDB.
+
+#### `_get_metadata_by_id_mongo(metadata_id)`
+
+Mengambil metadata MongoDB berdasarkan ID.
+
+#### `_update_metadata_mongo(metadata_id, data)`
+
+Update metadata MongoDB.
+
+Logika:
+- set field yang dikirim;
+- update `updated_at`;
+- return data terbaru.
+
+#### `_delete_metadata_mongo(metadata_id)`
+
+Menghapus metadata dari MongoDB.
+
+#### `create_metadata(data)`
+
+Facade create metadata.
+
+Fungsi ini memilih JSON atau MongoDB berdasarkan konfigurasi.
+
+Alasannya:
+- router tidak perlu tahu storage yang sedang aktif.
+
+#### `get_all_metadata()`
+
+Facade list metadata.
+
+#### `get_metadata_by_id(metadata_id)`
+
+Facade detail metadata.
+
+#### `update_metadata(metadata_id, data)`
+
+Facade update metadata.
+
+#### `delete_metadata(metadata_id)`
+
+Facade delete metadata.
+
+#### `migrate_json_to_mongodb()`
+
+Memindahkan data JSON ke MongoDB.
+
+Alasannya:
+- transisi dari development storage ke database bisa dilakukan tanpa menulis script terpisah.
+
+#### `check_storage_health()`
+
+Mengecek kondisi storage aktif.
+
+Alasannya:
+- membantu debugging apakah service memakai JSON atau MongoDB dan apakah storage dapat diakses.
+
+### `utils/internal_auth.py`
+
+Fungsi-fungsinya sama dengan service lain:
+
+- `_load_env_file`;
+- `get_internal_api_key`;
+- `internal_auth_headers`;
+- `require_internal_api_key`.
+
+Tujuannya:
+- melindungi metadata service dari akses langsung tanpa API key internal.

@@ -100,3 +100,124 @@ Alasannya:
 ## Catatan Desain
 
 Service ini dipisah karena dependency ML biasanya lebih berat dibanding service lain. Jika nanti model diganti, perubahan cukup dilakukan di service ini tanpa mengubah upload service atau decision engine.
+
+## Penjelasan Kode Per Fungsi
+
+### `app.py`
+
+#### `health()`
+
+Endpoint health check.
+
+Fungsi:
+- mengembalikan status service.
+
+Alasannya:
+- memudahkan pengecekan apakah service ML siap dipanggil.
+
+### `routers/feature_router.py`
+
+#### `extract_image(file: UploadFile = File(...))`
+
+Endpoint utama ekstraksi fitur.
+
+Alur:
+1. Menerima file gambar dari request.
+2. Membaca file menjadi bytes.
+3. Memanggil `extract_features(image_bytes)`.
+4. Mengembalikan embedding CLIP dan CNN.
+
+Alasannya:
+- router hanya menangani HTTP dan file upload;
+- logic model tetap berada di service layer.
+
+### `utils/image_utils.py`
+
+#### `load_image_from_bytes(image_bytes)`
+
+Mengubah bytes gambar menjadi object PIL Image.
+
+Logika:
+- membaca bytes dengan `BytesIO`;
+- membuka gambar memakai PIL;
+- mengubah gambar menjadi RGB.
+
+Alasannya:
+- CLIP dan CNN membutuhkan format gambar yang konsisten;
+- RGB menghindari masalah gambar grayscale, palette, atau alpha channel.
+
+### `services/feature_service.py`
+
+#### `extract_features(image_bytes)`
+
+Fungsi utama ekstraksi semua fitur.
+
+Alur:
+1. Ubah bytes menjadi PIL Image.
+2. Ambil embedding CLIP melalui `extract_clip_embedding`.
+3. Ambil embedding CNN melalui `extract_cnn_embedding`.
+4. Return keduanya dalam satu dictionary.
+
+Alasannya:
+- upload service cukup memanggil satu endpoint untuk mendapatkan dua jenis embedding;
+- CLIP dan CNN diproses dengan input gambar yang sama.
+
+### `services/clip_service.py`
+
+#### `extract_clip_embedding(image)`
+
+Menghasilkan embedding CLIP dari gambar.
+
+Fungsi CLIP:
+- menangkap kemiripan semantik atau konteks visual;
+- membantu menemukan gambar yang konsepnya mirip walaupun tidak identik.
+
+Alasan dipakai:
+- plagiarisme visual bisa berupa peniruan konsep, pose, atau komposisi.
+
+### `services/cnn_service.py`
+
+#### `extract_cnn_embedding(image)`
+
+Menghasilkan embedding CNN dari gambar.
+
+Fungsi CNN:
+- menangkap detail visual seperti bentuk, warna, tekstur, dan komposisi.
+
+Alasan dipakai:
+- membantu mendeteksi copy/modifikasi gambar seperti resize, crop, watermark, brightness, dan contrast.
+
+### `schemas/feature_schema.py`
+
+#### `FeatureResponse`
+
+Schema response feature extraction.
+
+Field utama:
+- `clip_embedding`;
+- `cnn_embedding`;
+- status proses.
+
+Alasannya:
+- service pemanggil menerima format embedding yang konsisten.
+
+### `utils/internal_auth.py`
+
+#### `_load_env_file(path)`
+
+Membaca `.env` lokal ke environment.
+
+#### `get_internal_api_key()`
+
+Mengambil internal API key.
+
+#### `internal_auth_headers()`
+
+Membuat header internal auth untuk request antar-service.
+
+#### `require_internal_api_key(...)`
+
+Dependency FastAPI untuk menolak request tanpa API key internal yang valid.
+
+Alasannya:
+- feature extraction termasuk service internal dan tidak sebaiknya dipanggil bebas dari luar.

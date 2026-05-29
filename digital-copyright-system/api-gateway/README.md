@@ -104,3 +104,272 @@ Alasannya:
 ## Catatan Desain
 
 API Gateway sengaja dibuat tipis. Business logic utama tetap berada di service masing-masing. Dengan pola ini, perubahan logic similarity, decision, atau metadata tidak perlu mengubah gateway terlalu banyak.
+
+## Penjelasan Kode Per Fungsi
+
+### `app.py`
+
+#### `lifespan(app: FastAPI)`
+
+Lifecycle aplikasi yang berjalan saat API Gateway start dan shutdown.
+
+Logika:
+- saat start, membuat `httpx.AsyncClient`;
+- client disimpan ke `app.state.http_client`;
+- saat shutdown, client ditutup.
+
+Alasannya:
+- request proxy antar-service memakai koneksi HTTP;
+- membuat satu shared client lebih efisien daripada membuat client baru di setiap request;
+- koneksi ditutup dengan benar saat aplikasi berhenti.
+
+#### `create_app() -> FastAPI`
+
+Factory untuk membuat instance FastAPI.
+
+Logika:
+- membuat object `FastAPI`;
+- memasang middleware CORS;
+- memasang middleware request id;
+- mendaftarkan router health dan proxy.
+
+Alasannya:
+- struktur aplikasi lebih rapi;
+- mudah diuji karena pembuatan app dipusatkan di satu fungsi.
+
+### `config/settings.py`
+
+#### `_load_env_file(path: Path)`
+
+Membaca file `.env` lalu memasukkan key/value ke environment variable.
+
+Alasannya:
+- service tetap bisa jalan lokal tanpa harus set environment manual;
+- nilai dari environment yang sudah ada tidak ditimpa.
+
+#### `_load_yaml(path: Path) -> dict`
+
+Membaca konfigurasi YAML.
+
+Alasannya:
+- default konfigurasi lebih mudah dibaca dan dirawat di `settings.yaml`.
+
+#### `_get_env(name: str, default: Any) -> Any`
+
+Mengambil environment variable dengan fallback default.
+
+Alasannya:
+- konfigurasi bisa dioverride dari `.env` atau Docker.
+
+#### `_get_list_env(name: str, default: list[str]) -> list[str]`
+
+Mengambil environment variable berbentuk list yang dipisah koma.
+
+Dipakai untuk:
+- daftar allowed origins CORS.
+
+Alasannya:
+- satu variable `.env` bisa menyimpan banyak origin frontend.
+
+#### `ServiceConfig`
+
+Dataclass untuk menyimpan URL service internal.
+
+Alasannya:
+- URL service tidak tersebar sebagai string mentah di banyak file.
+
+#### `Settings`
+
+Dataclass konfigurasi gateway.
+
+Berisi:
+- konfigurasi service internal,
+- CORS,
+- internal API key.
+
+#### `load_settings() -> Settings`
+
+Menggabungkan konfigurasi dari YAML dan environment.
+
+Alasannya:
+- YAML menjadi default;
+- `.env` atau Docker environment dapat override nilai sesuai environment.
+
+### `middleware/request_id.py`
+
+#### `RequestIdMiddleware.dispatch(request, call_next)`
+
+Menambahkan `X-Request-ID` pada request dan response.
+
+Alur:
+1. Ambil request id dari header jika ada.
+2. Jika tidak ada, buat UUID baru.
+3. Simpan ke `request.state.request_id`.
+4. Lanjutkan request ke handler berikutnya.
+5. Tambahkan request id ke response.
+
+Alasannya:
+- memudahkan tracing request lintas-service.
+
+### `router/health_routes.py`
+
+#### `health()`
+
+Health check dasar API Gateway.
+
+Output:
+
+```json
+{"status": "ok"}
+```
+
+#### `api_health()`
+
+Health check versi API.
+
+Biasanya dipakai jika ingin membedakan endpoint root health dan endpoint API health.
+
+#### `services_health(request: Request)`
+
+Mengecek health service internal.
+
+Logika:
+- memanggil endpoint health dari service-service internal;
+- mengembalikan status gabungan.
+
+Alasannya:
+- dari satu endpoint gateway, developer bisa tahu service mana yang hidup atau mati.
+
+### `utils/request_handler.py`
+
+#### `filter_proxy_headers(headers)`
+
+Membersihkan header sebelum diteruskan ke service internal.
+
+Header seperti `host` dan header transfer tertentu tidak perlu ikut diteruskan.
+
+Alasannya:
+- mencegah konflik header antara client, gateway, dan service internal.
+
+### `utils/proxy.py`
+
+#### `build_target_url(service_name: str, path: str) -> str`
+
+Membentuk URL tujuan service internal.
+
+Input:
+- nama service,
+- path endpoint.
+
+Output:
+- URL lengkap ke upstream service.
+
+Alasannya:
+- logic pembentukan URL hanya ada di satu tempat.
+
+#### `proxy_request(request: Request, service_name: str, path: str) -> Response`
+
+Proxy umum untuk request JSON atau request biasa.
+
+Alur:
+1. Ambil method, query, body, dan header dari request.
+2. Bangun URL target.
+3. Tambahkan internal API key.
+4. Kirim request ke service tujuan.
+5. Kembalikan response service tujuan ke client.
+
+Alasannya:
+- API Gateway tidak perlu menulis ulang logic HTTP untuk setiap endpoint.
+
+#### `proxy_multipart_request(...)`
+
+Proxy khusus multipart upload.
+
+Dipakai untuk:
+- upload file gambar ke upload service.
+
+Alasannya:
+- multipart tidak bisa selalu diperlakukan sama seperti JSON body;
+- file harus dibangun ulang agar bisa diteruskan dengan benar.
+
+### `router/proxy_routes.py`
+
+#### Schema metadata dan register
+
+Class seperti `MetadataBase`, `MetadataCreate`, `MetadataUpdate`, `EmbeddingReferenceUpdate`, `MetadataResponse`, `RegisterMetadataRequest`, dan `ReviewCheckRequest` dipakai untuk dokumentasi OpenAPI gateway.
+
+Alasannya:
+- Swagger API Gateway menampilkan body request yang jelas;
+- developer frontend tidak perlu membuka service internal hanya untuk melihat bentuk payload.
+
+#### `upload(...)`
+
+Endpoint gateway untuk upload gambar.
+
+Logika:
+- menerima file dan pilihan threshold dari frontend;
+- meneruskan multipart request ke upload service.
+
+#### `register_metadata(...)`
+
+Endpoint gateway untuk registrasi metadata setelah pengecekan plagiarisme.
+
+Logika:
+- menerima `check_id` dan data metadata;
+- meneruskan request ke upload service;
+- upload service yang mengatur Cloudinary, MongoDB, dan Milvus.
+
+#### `approve_check(...)` dan `reject_check(...)`
+
+Endpoint review manual.
+
+Fungsi:
+- approve membuat `check_id` boleh dipakai untuk registrasi;
+- reject membuat `check_id` tidak boleh dipakai.
+
+#### `metadata_collection(request)`
+
+Proxy untuk list metadata.
+
+#### `create_metadata_item(...)`
+
+Proxy untuk create metadata langsung.
+
+Catatan:
+- untuk workflow normal setelah plagiarisme check, gunakan `register_metadata`;
+- endpoint CRUD langsung berguna untuk administrasi atau testing.
+
+#### `read_metadata_item(...)`
+
+Mengambil detail metadata berdasarkan ID.
+
+#### `update_metadata_item(...)`
+
+Update metadata parsial.
+
+#### `update_metadata_embedding(...)`
+
+Update referensi embedding metadata.
+
+Biasanya dipakai setelah embedding berhasil disimpan ke Milvus.
+
+#### `delete_metadata_item(...)`
+
+Delete lengkap dari gateway.
+
+Alur cleanup:
+1. Ambil detail metadata.
+2. Hapus gambar Cloudinary jika ada `cloudinary_public_id`.
+3. Hapus vector Milvus jika ada `milvus_id` atau `metadata_id`.
+4. Hapus metadata dari MongoDB.
+5. Kembalikan ringkasan cleanup.
+
+Alasannya:
+- delete metadata harus membersihkan semua resource terkait.
+
+#### `delete_metadata_vector(...)`
+
+Menghapus vector Milvus berdasarkan metadata ID.
+
+Alasannya:
+- disediakan sebagai endpoint khusus jika perlu cleanup vector saja.
