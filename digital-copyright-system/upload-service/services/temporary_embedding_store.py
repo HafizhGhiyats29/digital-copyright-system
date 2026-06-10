@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Optional
@@ -23,7 +24,15 @@ def _cleanup_expired() -> None:
         _store.pop(check_id, None)
 
 
-def save_temporary_embedding(check_id: str, feature: dict, decision: dict, can_register: bool, file_bytes: bytes | None = None, filename: str | None = None) -> None:
+def save_temporary_embedding(
+    check_id: str,
+    feature: dict,
+    decision: dict,
+    can_register: bool,
+    file_bytes: bytes | None = None,
+    filename: str | None = None,
+    report: dict | None = None,
+) -> None:
     with _lock:
         _cleanup_expired()
         _store[check_id] = {
@@ -34,6 +43,7 @@ def save_temporary_embedding(check_id: str, feature: dict, decision: dict, can_r
             "filename": filename,
             "manual_review_status": None,
             "manual_review_reason": None,
+            "report": deepcopy(report) if report else None,
             "created_at": _now(),
             "expires_at": _now() + _ttl,
         }
@@ -61,4 +71,17 @@ def review_temporary_embedding(check_id: str, approved: bool, reason: Optional[s
         item["manual_review_status"] = "approved" if approved else "rejected"
         item["manual_review_reason"] = reason
         item["can_register"] = approved
+
+        report = item.get("report")
+        if report:
+            report["can_register"] = approved
+            report["registration_status"] = "allowed" if approved else "blocked"
+            report["registration_reason"] = (
+                "Registrasi diizinkan setelah hasil pengecekan disetujui melalui review manual."
+                if approved
+                else "Registrasi ditolak setelah hasil pengecekan ditolak melalui review manual."
+            )
+            report["manual_review_status"] = item["manual_review_status"]
+            report["manual_review_reason"] = reason
+
         return item

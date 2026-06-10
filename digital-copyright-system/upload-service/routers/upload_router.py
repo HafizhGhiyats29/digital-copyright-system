@@ -1,4 +1,6 @@
-﻿from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends  # Import FastAPI tools
+from copy import deepcopy
+from datetime import datetime, timezone
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends  # Import FastAPI tools
 from typing import Optional  # Import Optional untuk parameter opsional
 from pydantic import BaseModel, Field  # Schema untuk registrasi metadata setelah pengecekan
 from utils.image_validator import validate_image
@@ -99,6 +101,13 @@ async def register_metadata(data: RegisterMetadataRequest):
         )
 
     metadata_payload = data.model_dump(exclude_none=True)  # Simpan check_id dan abaikan field optional kosong
+    report_snapshot = deepcopy(temporary_check.get("report"))
+
+    if report_snapshot:
+        report_saved_at = datetime.now(timezone.utc).isoformat()
+        report_snapshot["saved_at"] = report_saved_at
+        metadata_payload["report"] = report_snapshot
+        metadata_payload["report_saved_at"] = report_saved_at
     cloudinary_public_id = None  # Dipakai untuk rollback jika create metadata gagal
 
     if not metadata_payload.get("image_url") and temporary_check.get("file_bytes") is not None:
@@ -334,6 +343,20 @@ async def upload_image(  # Fungsi menerima upload gambar dan threshold
     registration_gate = build_registration_gate(decision_result)  # Tentukan izin registrasi
     check_id = request_id  # Gunakan request id sebagai id pengecekan
 
+    report_snapshot = {
+        "status": "processed",
+        "check_id": check_id,
+        "can_register": registration_gate["can_register"],
+        "registration_status": registration_gate["registration_status"],
+        "registration_reason": registration_gate["registration_reason"],
+        "original_feature": {
+            "status": original_feature.get("status", "processed"),
+        },
+        "web_search_result": web_result,
+        "similarity_result": similarity_result,
+        "decision_result": decision_result,
+    }
+
     save_temporary_embedding(  # Simpan embedding sementara untuk dipakai ulang jika registrasi diizinkan
         check_id=check_id,  # ID pengecekan
         feature=original_feature,  # Embedding hasil feature extraction
@@ -341,6 +364,7 @@ async def upload_image(  # Fungsi menerima upload gambar dan threshold
         can_register=registration_gate["can_register"],  # Status izin registrasi
         file_bytes=file_bytes,  # Bytes gambar asli untuk upload Cloudinary saat registrasi
         filename=file.filename,  # Nama file asli untuk audit sederhana
+        report=report_snapshot,  # Snapshot hasil pemeriksaan untuk disimpan bersama metadata
     )  # Menutup penyimpanan embedding sementara
 
     return {  # Mengembalikan response final ke frontend

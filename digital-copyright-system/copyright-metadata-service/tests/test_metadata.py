@@ -12,6 +12,8 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 os.environ["METADATA_STORAGE_TYPE"] = "json"
+os.environ["INTERNAL_API_KEY"] = "metadata-test-internal-key"
+INTERNAL_HEADERS = {"X-Internal-API-Key": os.environ["INTERNAL_API_KEY"]}
 
 import services.metadata_store as metadata_store
 from app import app
@@ -27,7 +29,7 @@ def use_isolated_json_store(monkeypatch):
 def test_metadata_crud_and_embedding_update(monkeypatch):
     data_path = use_isolated_json_store(monkeypatch)
 
-    client = TestClient(app)
+    client = TestClient(app, headers=INTERNAL_HEADERS)
 
     payload = {
         "ki_id": "4686",
@@ -44,6 +46,20 @@ def test_metadata_crud_and_embedding_update(monkeypatch):
         "milvus_id": None,
         "embedding_version": None,
         "embedding_status": "pending",
+        "report": {
+            "similarity_result": {
+                "overall_score": 0.42,
+            },
+            "decision_result": {
+                "decision": {
+                    "status": "no_significant_similarity",
+                    "risk_level": "very_low",
+                    "requires_review": False,
+                },
+            },
+            "registration_status": "allowed",
+        },
+        "report_saved_at": "2026-06-10T12:00:00Z",
     }
 
     create_response = client.post("/metadata", json=payload)
@@ -54,6 +70,9 @@ def test_metadata_crud_and_embedding_update(monkeypatch):
     assert created["embedding_status"] == "pending"
     assert created["created_at"]
     assert created["updated_at"]
+    assert created["report"]["similarity_result"]["overall_score"] == 0.42
+    assert created["report"]["registration_status"] == "allowed"
+    assert created["report_saved_at"] == "2026-06-10T12:00:00Z"
 
     list_response = client.get("/metadata")
     assert list_response.status_code == 200
@@ -94,6 +113,8 @@ def test_metadata_crud_and_embedding_update(monkeypatch):
     stored_items = json.loads(data_path.read_text(encoding="utf-8"))
     assert stored_items[0]["id"] == metadata_id
     assert stored_items[0]["embedding_status"] == "ready"
+    assert stored_items[0]["report"]["registration_status"] == "allowed"
+    assert stored_items[0]["report_saved_at"] == "2026-06-10T12:00:00Z"
 
     delete_response = client.delete(f"/metadata/{metadata_id}")
     assert delete_response.status_code == 200
@@ -108,7 +129,7 @@ def test_metadata_crud_and_embedding_update(monkeypatch):
 def test_update_without_fields_returns_400(monkeypatch):
     data_path = use_isolated_json_store(monkeypatch)
 
-    client = TestClient(app)
+    client = TestClient(app, headers=INTERNAL_HEADERS)
     create_response = client.post(
         "/metadata",
         json={

@@ -58,7 +58,7 @@ def migrate_json_metadata_to_mongodb():
 )
 def create(data: MetadataCreate):
     try:
-        return create_metadata(data.model_dump(exclude_none=True))
+        return create_metadata(data.model_dump(exclude_none=True, mode="json"))
     except DuplicateMetadataError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -84,7 +84,7 @@ def read_by_id(metadata_id: str):
 
 @app.put("/metadata/{metadata_id}", response_model=MetadataResponse, dependencies=[Depends(require_internal_api_key)])
 def update(metadata_id: str, data: MetadataUpdate):
-    payload = data.model_dump(exclude_unset=True)
+    payload = data.model_dump(exclude_unset=True, mode="json")
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

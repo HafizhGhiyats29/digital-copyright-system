@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -20,6 +20,8 @@ class MetadataBase(BaseModel):
     milvus_id: Optional[str] = Field(default=None, description="ID row Milvus yang menyimpan CLIP dan CNN embedding")
     embedding_version: Optional[str] = Field(default=None, description="Versi embedding/model yang digunakan")
     embedding_status: str = Field(default="pending", description="Status embedding: pending, ready, atau failed")
+    report: Optional[dict[str, Any]] = Field(default=None, description="Snapshot hasil pemeriksaan plagiarisme untuk metadata ini")
+    report_saved_at: Optional[datetime] = Field(default=None, description="Waktu laporan pemeriksaan disimpan")
 
 
 class MetadataCreate(MetadataBase):
@@ -42,6 +44,8 @@ class MetadataUpdate(BaseModel):
     milvus_id: Optional[str] = None
     embedding_version: Optional[str] = None
     embedding_status: Optional[str] = None
+    report: Optional[dict[str, Any]] = None
+    report_saved_at: Optional[datetime] = None
 
 
 class EmbeddingReferenceUpdate(BaseModel):
