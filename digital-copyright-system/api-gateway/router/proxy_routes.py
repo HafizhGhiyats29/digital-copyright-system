@@ -1,5 +1,5 @@
 ﻿from datetime import datetime  # Import datetime untuk response schema metadata
-from typing import Optional  # Import Optional untuk form yang tidak wajib diisi
+from typing import Any, Optional  # Import tipe data untuk form dan report metadata
 
 import httpx  # Import HTTP client exception untuk orchestration delete
 from fastapi import APIRouter, Body, File, Form, HTTPException, Request, UploadFile, status  # Import router, request, dan multipart tools FastAPI
@@ -61,6 +61,15 @@ class MetadataResponse(MetadataBase):  # Schema response metadata
     id: str
     created_at: datetime
     updated_at: datetime
+
+
+class MetadataReportResponse(BaseModel):  # Schema response snapshot laporan pemeriksaan
+    metadata_id: str
+    check_id: Optional[str] = None
+    title: str
+    image_url: Optional[str] = None
+    report: dict[str, Any]
+    report_saved_at: Optional[datetime] = None
 
 
 class RegisterMetadataRequest(BaseModel):  # Schema registrasi metadata setelah upload/check aman
@@ -176,6 +185,18 @@ async def read_metadata_item(request: Request, metadata_id: str):  # Handler pro
         "copyright-metadata-service",  # Nama upstream service tujuan
         f"/metadata/{metadata_id}",  # Path endpoint item metadata
     )  # Menutup proxy metadata item
+
+
+@router.get(
+    "/metadata/{metadata_id}/report",
+    response_model=MetadataReportResponse,
+)  # Endpoint gateway untuk mengambil laporan pemeriksaan metadata
+async def read_metadata_report(request: Request, metadata_id: str):
+    return await proxy_request(
+        request,
+        "copyright-metadata-service",
+        f"/metadata/{metadata_id}/report",
+    )
 
 
 @router.put("/metadata/{metadata_id}", response_model=MetadataResponse)  # Endpoint gateway untuk update metadata

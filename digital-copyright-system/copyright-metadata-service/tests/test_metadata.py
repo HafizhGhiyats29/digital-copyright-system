@@ -82,6 +82,14 @@ def test_metadata_crud_and_embedding_update(monkeypatch):
     assert detail_response.status_code == 200
     assert detail_response.json()["ki_uuid"] == payload["ki_uuid"]
 
+    report_response = client.get(f"/metadata/{metadata_id}/report")
+    assert report_response.status_code == 200
+    report_data = report_response.json()
+    assert report_data["metadata_id"] == metadata_id
+    assert report_data["title"] == payload["title"]
+    assert report_data["report"]["similarity_result"]["overall_score"] == 0.42
+    assert report_data["report_saved_at"] == "2026-06-10T12:00:00Z"
+
     update_response = client.put(
         f"/metadata/{metadata_id}",
         json={
@@ -138,6 +146,10 @@ def test_update_without_fields_returns_400(monkeypatch):
         },
     )
     metadata_id = create_response.json()["id"]
+
+    report_response = client.get(f"/metadata/{metadata_id}/report")
+    assert report_response.status_code == 404
+    assert report_response.json()["detail"] == "Metadata report not found"
 
     update_response = client.put(f"/metadata/{metadata_id}", json={})
     assert update_response.status_code == 400

@@ -54,6 +54,13 @@ class EmbeddingReferenceUpdate(BaseModel):
     embedding_version: Optional[str] = Field(default=None, description="Versi embedding/model")
     embedding_status: str = Field(..., description="Status embedding: pending, ready, atau failed")
 
+class MetadataReportResponse(BaseModel):
+    metadata_id: str
+    check_id: Optional[str] = None
+    title: str
+    image_url: Optional[str] = None
+    report: dict[str, Any]
+    report_saved_at: Optional[datetime] = None
 
 class MetadataResponse(MetadataBase):
     id: str

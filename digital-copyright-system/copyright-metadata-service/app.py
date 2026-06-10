@@ -1,9 +1,10 @@
-﻿from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from models.metadata_model import (
     EmbeddingReferenceUpdate,
     MetadataCreate,
+    MetadataReportResponse,
     MetadataResponse,
     MetadataUpdate,
 )
@@ -71,6 +72,30 @@ def read_all():
     return get_all_metadata()
 
 
+@app.get("/metadata/{metadata_id}/report", response_model=MetadataReportResponse)
+def read_metadata_report(metadata_id: str):
+    item = get_metadata_by_id(metadata_id)
+    if item is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Metadata not found",
+        )
+
+    report = item.get("report")
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Metadata report not found",
+        )
+
+    return {
+        "metadata_id": item["id"],
+        "check_id": item.get("check_id"),
+        "title": item["title"],
+        "image_url": item.get("image_url"),
+        "report": report,
+        "report_saved_at": item.get("report_saved_at"),
+    }
 @app.get("/metadata/{metadata_id}", response_model=MetadataResponse)
 def read_by_id(metadata_id: str):
     item = get_metadata_by_id(metadata_id)

@@ -31,9 +31,19 @@ class RegistrationReportTest(unittest.TestCase):
             "can_register": True,
             "registration_status": "allowed",
             "registration_reason": "Registrasi diizinkan.",
-            "web_search_result": {"found_on_web": False, "matches": []},
+            "web_search_result": {
+                "found_on_web": True,
+                "matches": [
+                    {
+                        "title": "Kandidat eksternal",
+                        "clip_embedding": [0.1, 0.2],
+                        "cnn_embedding": [0.3, 0.4],
+                    },
+                ],
+            },
             "similarity_result": {
                 "overall_score": 0.42,
+                "clip_embedding": [0.5, 0.6],
                 "results": {"internal_top3": [], "external_top3": []},
             },
             "decision_result": {
@@ -102,6 +112,16 @@ class RegistrationReportTest(unittest.TestCase):
             captured_payload["report_saved_at"],
             captured_payload["report"]["saved_at"],
         )
+        stored_report = captured_payload["report"]
+        self.assertNotIn(
+            "clip_embedding",
+            stored_report["web_search_result"]["matches"][0],
+        )
+        self.assertNotIn(
+            "cnn_embedding",
+            stored_report["web_search_result"]["matches"][0],
+        )
+        self.assertNotIn("clip_embedding", stored_report["similarity_result"])
         self.assertEqual(response["metadata"]["report"]["check_id"], check_id)
         self.assertIsNone(get_temporary_embedding(check_id))
 
@@ -135,6 +155,29 @@ class RegistrationReportTest(unittest.TestCase):
             "Karya dinyatakan orisinal oleh reviewer.",
         )
         delete_temporary_embedding(check_id)
+
+    def test_remove_embeddings_from_nested_report(self):
+        source = {
+            "matches": [
+                {
+                    "title": "Kandidat",
+                    "clip_embedding": [0.1, 0.2],
+                    "cnn_embedding": [0.3, 0.4],
+                },
+            ],
+            "similarity_result": {
+                "clip_score": 0.8,
+                "cnn_score": 0.7,
+            },
+        }
+
+        cleaned = upload_router.remove_embeddings(source)
+
+        self.assertNotIn("clip_embedding", cleaned["matches"][0])
+        self.assertNotIn("cnn_embedding", cleaned["matches"][0])
+        self.assertEqual(cleaned["matches"][0]["title"], "Kandidat")
+        self.assertEqual(cleaned["similarity_result"]["clip_score"], 0.8)
+        self.assertIn("clip_embedding", source["matches"][0])
 
 if __name__ == "__main__":
     unittest.main()

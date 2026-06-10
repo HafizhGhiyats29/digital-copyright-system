@@ -1,4 +1,3 @@
-from copy import deepcopy
 from datetime import datetime, timezone
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends  # Import FastAPI tools
 from typing import Optional  # Import Optional untuk parameter opsional
@@ -57,6 +56,20 @@ def build_cloudinary_public_id(title: str, identifier: Optional[str]) -> str:  #
     return title_slug or identifier_slug or str(uuid.uuid4())
 
 
+def remove_embeddings(value):
+    """Membuat salinan data report tanpa menyimpan vector embedding ke metadata."""
+    if isinstance(value, dict):
+        return {
+            key: remove_embeddings(item)
+            for key, item in value.items()
+            if key not in {"clip_embedding", "cnn_embedding"}
+        }
+
+    if isinstance(value, list):
+        return [remove_embeddings(item) for item in value]
+
+    return value
+
 def build_registration_gate(decision_result):  # Menentukan apakah hasil cek boleh lanjut registrasi
     decision = decision_result.get("decision", {}) if decision_result else {}  # Ambil detail keputusan
     status = decision.get("status", "unknown")  # Ambil status decision
@@ -101,7 +114,7 @@ async def register_metadata(data: RegisterMetadataRequest):
         )
 
     metadata_payload = data.model_dump(exclude_none=True)  # Simpan check_id dan abaikan field optional kosong
-    report_snapshot = deepcopy(temporary_check.get("report"))
+    report_snapshot = remove_embeddings(temporary_check.get("report"))
 
     if report_snapshot:
         report_saved_at = datetime.now(timezone.utc).isoformat()
@@ -352,9 +365,9 @@ async def upload_image(  # Fungsi menerima upload gambar dan threshold
         "original_feature": {
             "status": original_feature.get("status", "processed"),
         },
-        "web_search_result": web_result,
-        "similarity_result": similarity_result,
-        "decision_result": decision_result,
+        "web_search_result": remove_embeddings(web_result),
+        "similarity_result": remove_embeddings(similarity_result),
+        "decision_result": remove_embeddings(decision_result),
     }
 
     save_temporary_embedding(  # Simpan embedding sementara untuk dipakai ulang jika registrasi diizinkan
@@ -374,8 +387,8 @@ async def upload_image(  # Fungsi menerima upload gambar dan threshold
         "registration_status": registration_gate["registration_status"],  # Status registrasi
         "registration_reason": registration_gate["registration_reason"],  # Alasan keputusan registrasi
         "original_feature": original_feature,  # Embedding original
-        "web_search_result": web_result,  # Hasil web search
-        "similarity_result": similarity_result,  # Hasil similarity
+        "web_search_result": remove_embeddings(web_result),  # Hasil web search
+        "similarity_result": remove_embeddings(similarity_result),  # Hasil similarity
         "decision_result": decision_result  # Hasil decision-engine
     }  # Menutup response dictionary
 
