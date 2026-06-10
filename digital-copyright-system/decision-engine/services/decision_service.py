@@ -52,49 +52,6 @@ def get_thresholds(preset=None, custom_thresholds=None):  # Fungsi memilih thres
     return thresholds, threshold_source  # Return threshold dan sumbernyangembalikan threshold dan sumbernya
 
 
-def get_score_rules(threshold_source=None):  # Mengambil rule tambahan CLIP/CNN sesuai preset aktif
-    all_rules = settings.get("score_rules", {})  # Ambil rule jika tersedia
-    fallback_rules = {
-        "clip_high": 0.88,
-        "cnn_high": 0.75,
-        "final_high": 0.82,
-        "possible_final": 0.65,
-        "possible_clip": 0.80,
-        "possible_cnn": 0.60,
-    }
-
-    if "clip_high" in all_rules:  # Kompatibilitas jika config lama masih flat
-        rules = all_rules
-    else:
-        preset_name = threshold_source if threshold_source in all_rules else settings.get("default_preset", "balanced")
-        rules = all_rules.get(preset_name, all_rules.get("balanced", fallback_rules))
-
-    return {  # Return rule dengan fallback aman
-        "clip_high": float(rules.get("clip_high", fallback_rules["clip_high"])),
-        "cnn_high": float(rules.get("cnn_high", fallback_rules["cnn_high"])),
-        "final_high": float(rules.get("final_high", fallback_rules["final_high"])),
-        "possible_final": float(rules.get("possible_final", fallback_rules["possible_final"])),
-        "possible_clip": float(rules.get("possible_clip", fallback_rules["possible_clip"])),
-        "possible_cnn": float(rules.get("possible_cnn", fallback_rules["possible_cnn"])),
-    }
-
-
-def build_custom_score_rules(thresholds):  # Membuat rule CLIP/CNN otomatis dari custom threshold user
-    low = thresholds["low"]  # Ambil threshold low custom
-    medium = thresholds["medium"]  # Ambil threshold medium custom
-    high = thresholds["high"]  # Ambil threshold high custom
-    max_allowed = settings["max_allowed_threshold"]  # Batas maksimum threshold dari config
-
-    return {  # Rule turunan agar custom threshold tetap konsisten
-        "clip_high": min(high + 0.03, max_allowed),  # CLIP dibuat sedikit lebih ketat dari high karena sensitif pada konsep
-        "cnn_high": min(medium + 0.05, max_allowed),  # CNN high dekat medium karena mewakili detail visual
-        "final_high": (medium + high) / 2,  # Zona kuat di antara medium dan high
-        "possible_final": (low + medium) / 2,  # Zona abu-abu di antara low dan medium
-        "possible_clip": min(medium + 0.10, max_allowed),  # CLIP possible cukup tinggi agar semantic-only tidak terlalu mudah lolos
-        "possible_cnn": min(low + 0.05, max_allowed),  # CNN possible sedikit di atas low untuk menangkap detail visual awal
-    }
-
-
 def round_optional_score(score, round_decimals):  # Membulatkan score opsional
     if score is None:  # Jika score tidak dikirim
         return None  # Biarkan kosong
@@ -126,8 +83,6 @@ def build_decision(overall_score, clip_score=None, cnn_score=None, preset=None, 
     score = round(float(overall_score), round_decimals)  # Membulatkan overall_score
     clip = round_optional_score(clip_score, round_decimals)  # Membulatkan clip_score jika ada
     cnn = round_optional_score(cnn_score, round_decimals)  # Membulatkan cnn_score jika ada
-    score_rules = build_custom_score_rules(thresholds) if threshold_source == "custom" else get_score_rules(threshold_source)  # Rule CLIP/CNN dari custom atau preset
-
     high_threshold = thresholds["high"]  # Mengambil threshold high
     medium_threshold = thresholds["medium"]  # Mengambil threshold medium
     low_threshold = thresholds["low"]  # Mengambil threshold low
@@ -143,29 +98,6 @@ def build_decision(overall_score, clip_score=None, cnn_score=None, preset=None, 
             f"Kandidat dengan skor tertinggi melebihi threshold high {high_threshold} menggunakan mode {threshold_source}"  # Alasan
         )  # Menutup build_response
 
-    if clip is not None and cnn is not None:  # Jika score detail tersedia
-        if clip >= score_rules["clip_high"] and cnn >= score_rules["cnn_high"]:  # CLIP dan CNN sama-sama kuat
-            return build_response(  # Return high similarity berbasis dua sinyal
-                score,  # Overall score
-                clip,  # CLIP score
-                cnn,  # CNN score
-                "high_similarity",  # Status high similarity
-                "high",  # Risiko tinggi
-                True,  # Perlu review manual
-                f"CLIP score {clip} dan CNN score {cnn} melewati batas kuat ({score_rules['clip_high']}/{score_rules['cnn_high']})"  # Alasan
-            )  # Menutup build_response
-
-        if score >= score_rules["final_high"] and cnn >= score_rules["cnn_high"]:  # Final kuat dan detail visual cukup
-            return build_response(  # Return high similarity berbasis final + CNN
-                score,  # Overall score
-                clip,  # CLIP score
-                cnn,  # CNN score
-                "high_similarity",  # Status high similarity
-                "high",  # Risiko tinggi
-                True,  # Perlu review manual
-                f"Overall score {score} dan CNN score {cnn} melewati batas kuat ({score_rules['final_high']}/{score_rules['cnn_high']})"  # Alasan
-            )  # Menutup build_response
-
     if score >= medium_threshold:  # Mengecek apakah skor masuk kategori medium
         return build_response(  # Mengembalikan keputusan medium similarity
             score,  # Overall score
@@ -176,18 +108,6 @@ def build_decision(overall_score, clip_score=None, cnn_score=None, preset=None, 
             True,  # Perlu review manual
             f"Kandidat dengan skor tertinggi melebihi threshold medium {medium_threshold} menggunakan mode {threshold_source}"  # Alasan
         )  # Menutup build_response
-
-    if clip is not None and cnn is not None:  # Jika score detail tersedia
-        if score >= score_rules["possible_final"] or clip >= score_rules["possible_clip"] or cnn >= score_rules["possible_cnn"]:  # Sinyal sedang
-            return build_response(  # Return possible plagiarism
-                score,  # Overall score
-                clip,  # CLIP score
-                cnn,  # CNN score
-                "possible_plagiarism",  # Status possible plagiarism
-                "medium",  # Risiko sedang
-                True,  # Perlu review manual
-                f"Salah satu sinyal melewati batas possible: overall>={score_rules['possible_final']}, CLIP>={score_rules['possible_clip']}, atau CNN>={score_rules['possible_cnn']}"  # Alasan
-            )  # Menutup build_response
 
     if score >= low_threshold:  # Mengecek apakah skor masuk kategori low
         return build_response(  # Mengembalikan keputusan low similarity

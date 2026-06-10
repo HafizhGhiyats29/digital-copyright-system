@@ -173,31 +173,6 @@ Alasannya:
 - threshold dibuat bertingkat agar hasil tidak hanya hitam-putih.
 - sistem bisa membedakan risiko tinggi, sedang, rendah, dan sangat rendah.
 
-### `score_rules`
-
-Berisi rule tambahan untuk membaca `clip_score` dan `cnn_score`.
-
-Contoh:
-
-```yaml
-balanced:
-  clip_high: 0.88
-  cnn_high: 0.75
-  final_high: 0.82
-  possible_final: 0.65
-  possible_clip: 0.80
-  possible_cnn: 0.60
-```
-
-Fungsinya:
-- menangkap kasus saat final score belum melewati high threshold, tetapi CLIP/CNN memberi sinyal kuat.
-- membuat sistem lebih sensitif terhadap kasus yang perlu review manual.
-
-Alasannya:
-- `overall_score` adalah gabungan.
-- Kadang satu sinyal kuat tertutup oleh sinyal lain yang lebih rendah.
-- `score_rules` membantu decision engine tidak terlalu polos hanya membaca satu angka final.
-
 ### `min_allowed_threshold` dan `max_allowed_threshold`
 
 Membatasi custom threshold dari user.
@@ -472,72 +447,6 @@ Catatan:
 - Jika ingin custom selalu mengalahkan preset, logic prioritas ini bisa diubah.
 - Saat ini desainnya: pilih salah satu, preset lebih utama jika dua-duanya dikirim.
 
-### `get_score_rules(threshold_source=None)`
-
-Fungsi:
-- mengambil rule tambahan CLIP/CNN berdasarkan preset aktif.
-
-Input:
-- `threshold_source`, misalnya `"balanced"`, `"strict"`, atau `"sensitive"`.
-
-Output:
-
-```python
-{
-    "clip_high": float,
-    "cnn_high": float,
-    "final_high": float,
-    "possible_final": float,
-    "possible_clip": float,
-    "possible_cnn": float
-}
-```
-
-Alur:
-1. Ambil `score_rules` dari settings.
-2. Siapkan fallback default.
-3. Jika config lama masih berbentuk flat, tetap didukung.
-4. Jika config baru berbentuk per-preset, ambil rule sesuai preset.
-5. Jika preset tidak ditemukan, fallback ke `balanced`.
-6. Semua nilai dikonversi ke float.
-
-Alasannya:
-- menjaga kompatibilitas dengan config lama.
-- setiap preset dapat memiliki sensitivitas CLIP/CNN berbeda.
-- fallback mencegah service crash jika config tidak lengkap.
-
-### `build_custom_score_rules(thresholds)`
-
-Fungsi:
-- membuat rule CLIP/CNN otomatis dari custom threshold user.
-
-Kenapa dibutuhkan:
-- user hanya mengisi `high`, `medium`, dan `low`.
-- tetapi decision engine juga butuh `clip_high`, `cnn_high`, `possible_clip`, dan lainnya.
-
-Logika turunan:
-
-```python
-clip_high = min(high + 0.03, max_allowed)
-cnn_high = min(medium + 0.05, max_allowed)
-final_high = (medium + high) / 2
-possible_final = (low + medium) / 2
-possible_clip = min(medium + 0.10, max_allowed)
-possible_cnn = min(low + 0.05, max_allowed)
-```
-
-Penjelasan:
-- `clip_high` sedikit lebih tinggi dari high karena CLIP sensitif pada kemiripan konsep.
-- `cnn_high` dekat medium karena CNN menangkap detail visual.
-- `final_high` berada di antara medium dan high sebagai zona kuat tambahan.
-- `possible_final` berada di antara low dan medium sebagai zona abu-abu.
-- `possible_clip` dibuat cukup tinggi agar kemiripan konsep saja tidak terlalu mudah dianggap review.
-- `possible_cnn` sedikit di atas low agar detail visual yang mencurigakan tetap tertangkap.
-
-Alasannya:
-- custom threshold tetap konsisten dengan rule tambahan.
-- user tidak perlu mengisi terlalu banyak angka.
-
 ### `round_optional_score(score, round_decimals)`
 
 Fungsi:
@@ -599,20 +508,13 @@ Alur lengkap:
 
 1. Ambil threshold dengan `get_thresholds()`.
 2. Bulatkan `overall_score`, `clip_score`, dan `cnn_score`.
-3. Ambil `score_rules`.
-4. Jika threshold custom, buat rule tambahan dengan `build_custom_score_rules()`.
-5. Cek apakah `overall_score >= high`.
-6. Jika iya, return `high_similarity`.
-7. Jika CLIP dan CNN tersedia, cek apakah keduanya melewati batas kuat.
-8. Jika iya, return `high_similarity`.
-9. Jika final score dan CNN kuat, return `high_similarity`.
-10. Cek apakah `overall_score >= medium`.
-11. Jika iya, return `medium_similarity`.
-12. Jika CLIP/CNN tersedia, cek possible signal.
-13. Jika salah satu possible signal lewat, return `possible_plagiarism`.
-14. Cek apakah `overall_score >= low`.
-15. Jika iya, return `low_similarity`.
-16. Jika semua tidak terpenuhi, return `no_significant_similarity`.
+3. Cek apakah `overall_score >= high`.
+4. Jika iya, return `high_similarity`.
+5. Cek apakah `overall_score >= medium`.
+6. Jika iya, return `medium_similarity`.
+7. Cek apakah `overall_score >= low`.
+8. Jika iya, return `low_similarity`.
+9. Jika semua tidak terpenuhi, return `no_significant_similarity`.
 
 Urutan ini penting.
 
@@ -620,13 +522,9 @@ Kenapa high dicek dulu:
 - risiko paling tinggi harus diprioritaskan.
 - jika sudah high, tidak perlu cek medium/low.
 
-Kenapa CLIP/CNN dicek setelah high final score:
-- final score tetap sinyal utama.
-- CLIP/CNN menjadi penguat untuk kasus khusus.
-
-Kenapa possible dicek sebelum low:
-- possible berarti ada sinyal mencurigakan walaupun final score belum medium.
-- jika langsung masuk low, kasus abu-abu bisa lolos tanpa review.
+`clip_score` dan `cnn_score` tetap dikembalikan pada response sebagai informasi
+analisis, tetapi tidak mengubah kategori keputusan. Dengan demikian, preset dan
+custom threshold mempunyai perilaku yang konsisten dan mudah diprediksi.
 
 ## Cabang Keputusan Pada `build_decision()`
 
@@ -648,37 +546,7 @@ Response:
 
 Di upload service, status ini biasanya menjadi `blocked`.
 
-### 2. `high_similarity` dari CLIP dan CNN
-
-Kondisi:
-
-```python
-clip >= clip_high and cnn >= cnn_high
-```
-
-Makna:
-- semantik dan visual detail sama-sama kuat.
-- walaupun final score belum melewati high threshold, dua sinyal utama sudah mencurigakan.
-
-Alasannya:
-- plagiarisme visual bisa terlihat dari gabungan konteks dan detail.
-
-### 3. `high_similarity` dari final + CNN
-
-Kondisi:
-
-```python
-score >= final_high and cnn >= cnn_high
-```
-
-Makna:
-- skor akhir kuat,
-- detail visual juga kuat.
-
-Alasannya:
-- CNN tinggi menunjukkan kemiripan visual yang lebih konkret.
-
-### 4. `medium_similarity`
+### 2. `medium_similarity`
 
 Kondisi:
 
@@ -695,29 +563,7 @@ Response:
 - `risk_level`: `medium`
 - `requires_review`: `True`
 
-### 5. `possible_plagiarism`
-
-Kondisi:
-
-```python
-score >= possible_final
-or clip >= possible_clip
-or cnn >= possible_cnn
-```
-
-Makna:
-- ada salah satu sinyal yang mencurigakan.
-- belum cukup kuat untuk medium similarity berdasarkan threshold utama.
-
-Response:
-- `risk_level`: `medium`
-- `requires_review`: `True`
-
-Alasannya:
-- kategori ini menjaga sistem tetap hati-hati.
-- cocok untuk kasus abu-abu.
-
-### 6. `low_similarity`
+### 3. `low_similarity`
 
 Kondisi:
 
@@ -735,7 +581,7 @@ Response:
 
 Di upload service, status ini boleh lanjut registrasi.
 
-### 7. `no_significant_similarity`
+### 4. `no_significant_similarity`
 
 Kondisi:
 
@@ -865,9 +711,9 @@ Bagian paling penting untuk dijelaskan dalam laporan:
 
 1. Decision engine memisahkan kebijakan keputusan dari similarity calculation.
 2. Threshold disimpan di config agar bisa disesuaikan dari hasil evaluasi.
-3. Sistem memakai `overall_score`, `clip_score`, dan `cnn_score`, bukan hanya satu skor.
-4. `possible_plagiarism` dipakai sebagai zona abu-abu untuk review manual.
-5. Custom threshold tetap dibuat konsisten melalui `build_custom_score_rules()`.
+3. `overall_score` menjadi satu-satunya dasar kategori keputusan.
+4. `clip_score` dan `cnn_score` tetap disertakan sebagai informasi analisis.
+5. Preset dan custom threshold memakai aturan kategori yang sama.
 
 ## Catatan Perbaikan Kecil
 

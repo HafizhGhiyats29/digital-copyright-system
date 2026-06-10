@@ -210,10 +210,9 @@ Aturan registrasi:
 
 ```text
 high_similarity      -> blocked
-possible_plagiarism  -> review_required
 medium_similarity    -> review_required
 low_similarity       -> allowed
-no_significant       -> allowed
+no_significant_similarity -> allowed
 ```
 
 Catatan: metadata service tidak melakukan embedding. Embedding tetap dibuat oleh feature-extraction-service saat proses upload/check, lalu hanya disimpan permanen ke Milvus jika hasil pengecekan aman.
