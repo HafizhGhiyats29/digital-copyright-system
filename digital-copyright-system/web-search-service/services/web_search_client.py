@@ -10,35 +10,42 @@ SERPAPI_KEY = config["serpapi_key"]  # Mengambil API key SerpAPI dari config
 
 
 async def process_candidate(item):  # Fungsi untuk memproses satu kandidat gambar dari SerpAPI
-    image_url_candidate = item.get("thumbnail")  # Mengambil URL thumbnail kandidat
+    original_image_url = item.get("image")  # URL gambar resolusi asli jika disediakan SerpAPI
+    thumbnail_url = item.get("thumbnail")  # URL thumbnail sebagai fallback
     source_url = item.get("link")  # Mengambil URL sumber kandidat
     title = item.get("title", "")  # Mengambil judul kandidat
 
-    if not image_url_candidate:  # Mengecek apakah thumbnail kosong
+    candidate_urls = list(dict.fromkeys(
+        url for url in (original_image_url, thumbnail_url) if url
+    ))
+
+    if not candidate_urls:  # Mengecek apakah kandidat tidak punya URL gambar
         return None  # Skip kandidat jika tidak punya gambar
 
-    try:  # Memulai error handling kandidat
-        image_bytes = await download_image(image_url_candidate)  # Download gambar kandidat menjadi bytes
-        embedding_result = await get_embedding(image_bytes)  # Ambil CLIP + CNN embedding dari feature service
+    for image_url_candidate in candidate_urls:
+        try:  # Coba gambar asli dahulu, lalu thumbnail jika gagal
+            image_bytes = await download_image(image_url_candidate)
+            embedding_result = await get_embedding(image_bytes)
 
-        clip_embedding = embedding_result.get("clip_embedding")  # Ambil embedding CLIP dari hasil feature service
-        cnn_embedding = embedding_result.get("cnn_embedding")  # Ambil embedding CNN dari hasil feature service
+            clip_embedding = embedding_result.get("clip_embedding")
+            cnn_embedding = embedding_result.get("cnn_embedding")
 
-        if not clip_embedding or not cnn_embedding:  # Validasi embedding tidak boleh kosong
-            logger.warning(f"Skip candidate {image_url_candidate}: embedding tidak lengkap")  # Log jika embedding kosong
-            return None  # Skip kandidat jika embedding tidak lengkap
+            if not clip_embedding or not cnn_embedding:
+                raise ValueError("embedding tidak lengkap")
 
-        return {  # Mengembalikan data kandidat yang valid
-            "image_url": image_url_candidate,  # URL gambar kandidat
-            "source_url": source_url,  # URL sumber kandidat
-            "title": title,  # Judul kandidat
-            "clip_embedding": clip_embedding,  # Embedding CLIP kandidat
-            "cnn_embedding": cnn_embedding  # Embedding CNN kandidat
-        }  # Menutup dictionary kandidat
+            return {
+                "image_url": image_url_candidate,
+                "source_url": source_url,
+                "title": title,
+                "clip_embedding": clip_embedding,
+                "cnn_embedding": cnn_embedding,
+            }
+        except Exception as error:
+            logger.warning(
+                f"Gagal memproses kandidat {image_url_candidate}: {error}"
+            )
 
-    except Exception as e:  # Menangkap error pada kandidat tertentu
-        logger.warning(f"Skip candidate {image_url_candidate}: {str(e)}")  # Log kandidat yang gagal
-        return None  # Skip kandidat yang gagal
+    return None  # Semua URL kandidat gagal diproses
 
 
 async def search_image(image_bytes):  # Fungsi utama web search gambar

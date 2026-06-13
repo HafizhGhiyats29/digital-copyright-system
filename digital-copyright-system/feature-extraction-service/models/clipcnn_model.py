@@ -14,7 +14,8 @@ clip_model = CLIPModel.from_pretrained(settings["clip_model_name"]).to(device)  
 clip_processor = CLIPProcessor.from_pretrained(settings["clip_model_name"])  # Load processor CLIP
 
 
-cnn_model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)  # Load ResNet50 pretrained
+cnn_weights = models.ResNet50_Weights.DEFAULT  # Gunakan bobot sekaligus preprocessing resmi ResNet50
+cnn_model = models.resnet50(weights=cnn_weights)  # Load ResNet50 pretrained
 cnn_model.fc = nn.Identity()  # Buang layer classifier agar output menjadi embedding
 cnn_model = cnn_model.to(device)  # Pindahkan CNN ke device
 

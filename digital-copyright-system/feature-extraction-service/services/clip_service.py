@@ -1,8 +1,10 @@
 import torch  # Library PyTorch untuk menjalankan inference model
 from models.clipcnn_model import clip_model, clip_processor, device  # Import model CLIP, processor, dan device
+from utils.image_utils import letterbox_image
 
 
 def extract_clip_embedding(image):  # Fungsi untuk mengambil embedding CLIP dari gambar PIL
+    image = letterbox_image(image)  # Pertahankan seluruh komposisi sebelum preprocessing CLIP
     inputs = clip_processor(  # Preprocess gambar agar sesuai input CLIP
         images=image,  # Gambar PIL yang akan diproses
         return_tensors="pt"  # Output processor dalam bentuk tensor PyTorch
