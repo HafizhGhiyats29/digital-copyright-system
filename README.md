@@ -1,10 +1,11 @@
 # Digital Copyright System
 
-Digital Copyright System adalah sistem microservice untuk mengecek kemiripan gambar karya sebelum metadata hak cipta didaftarkan. Sistem mengekstrak embedding gambar menggunakan CLIP dan CNN, mencari kandidat kemiripan internal dan eksternal, mengambil keputusan risiko plagiarisme, lalu menyimpan metadata dan embedding karya yang lolos .
+Digital Copyright System adalah sistem microservice untuk mengecek kemiripan gambar karya sebelum metadata hak cipta didaftarkan. Sistem mengekstrak embedding gambar menggunakan CLIP dan CNN, mencari kandidat kemiripan internal dan eksternal, mengambil keputusan risiko plagiarisme, lalu menyimpan metadata, gambar, report pemeriksaan, dan referensi embedding karya yang lolos verifikasi.
 
 ## Daftar Isi
 
 - [Fitur Utama](#fitur-utama)
+- [System Requirements](#system-requirements)
 - [Arsitektur](#arsitektur)
 - [Struktur Folder](#struktur-folder)
 - [Identitas Data](#identitas-data)
@@ -17,6 +18,58 @@ Digital Copyright System adalah sistem microservice untuk mengecek kemiripan gam
 - [Evaluasi Similarity](#evaluasi-similarity)
 - [Catatan Keamanan](#catatan-keamanan)
 
+## System Requirements
+
+Kebutuhan minimum yang disarankan untuk menjalankan sistem secara lokal:
+
+| Komponen | Kebutuhan |
+|---|---|
+| OS | Windows 10/11 64-bit, Linux, atau macOS |
+| Python | Python 3.10 atau 3.11 |
+| Node.js | Node.js 18+ |
+| Package manager frontend | `npm` atau `pnpm` |
+| Docker | Docker Desktop dengan Docker Compose |
+| RAM | Minimal 16 GB, disarankan 32 GB untuk model CLIP/CNN |
+| Disk kosong | Minimal 15-20 GB, disarankan lebih besar jika memakai Docker |
+| GPU | Opsional. CUDA dapat mempercepat feature extraction |
+
+Kebutuhan layanan eksternal:
+
+| Layanan | Fungsi |
+|---|---|
+| SerpAPI | Reverse image search / Google Lens |
+| Cloudinary | Object storage gambar karya dan gambar sementara untuk web search |
+| MongoDB | Database metadata karya |
+| Milvus | Vector database untuk embedding internal |
+| MinIO | Object storage internal untuk Milvus |
+
+Kebutuhan Python utama per backend:
+
+- `fastapi`
+- `uvicorn`
+- `pydantic`
+- `httpx`
+- `pymongo`
+- `pymilvus`
+- `Pillow`
+- `numpy`
+- `torch`
+- `torchvision`
+- `transformers`
+
+Kebutuhan frontend utama:
+
+- React
+- Vite
+- Tailwind CSS
+- Axios atau HTTP client sejenis
+
+Catatan:
+
+- Jika menjalankan seluruh service memakai Docker, pastikan Docker Desktop memiliki ruang disk cukup.
+- Model CLIP dan ResNet50 dapat mengunduh bobot model saat pertama kali dijalankan.
+- Jika preprocessing gambar berubah, embedding lama di Milvus perlu dibuat ulang agar hasil similarity konsisten.
+
 ## Fitur Utama
 
 - Upload gambar untuk cek indikasi plagiarisme.
@@ -25,9 +78,11 @@ Digital Copyright System adalah sistem microservice untuk mengecek kemiripan gam
   - CLIP embedding untuk konteks visual.
   - CNN embedding untuk detail visual.
 - Reverse image search eksternal menggunakan SerpAPI.
+- Kandidat eksternal diprioritaskan memakai URL gambar asli dari SerpAPI, lalu fallback ke thumbnail jika gambar asli gagal diunduh.
 - Pencarian internal menggunakan Milvus.
 - Metadata disimpan di MongoDB.
 - Gambar karya disimpan di Cloudinary.
+- Report hasil pengecekan disimpan bersama metadata tanpa menyimpan array embedding mentah.
 - Decision engine dengan preset threshold `strict`, `balanced`, dan `sensitive`.
 - Review manual untuk hasil yang berada di area abu-abu.
 - Registrasi metadata hanya bisa dilakukan dengan `check_id` hasil pengecekan.
@@ -74,6 +129,12 @@ Storage yang digunakan:
 | MongoDB | Menyimpan metadata karya |
 | Milvus | Menyimpan embedding CLIP dan CNN |
 | MinIO | Object storage internal untuk Milvus |
+
+Catatan embedding:
+
+- MongoDB hanya menyimpan metadata, report, dan referensi vector.
+- Array `clip_embedding` dan `cnn_embedding` tidak disimpan di MongoDB report.
+- Vector embedding karya yang lolos disimpan di Milvus.
 
 ## Struktur Folder
 
@@ -133,6 +194,8 @@ User upload gambar
   -> Upload Service membuat check_id
   -> Feature Extraction membuat CLIP dan CNN embedding
   -> Web Search mencari kandidat eksternal
+     -> mencoba gambar asli dari SerpAPI
+     -> fallback ke thumbnail jika gambar asli gagal
   -> Similarity Check mencari kandidat internal dan eksternal
   -> Decision Engine menentukan status
   -> Response dikirim ke frontend
@@ -185,8 +248,31 @@ Saat berhasil:
 - Gambar disimpan ke Cloudinary.
 - Embedding sementara dipromosikan ke Milvus.
 - Metadata menyimpan referensi `milvus_collection`, `milvus_id`, `embedding_version`, dan `embedding_status`.
+- Report pengecekan disimpan ke field `report`.
+- Waktu penyimpanan report disimpan ke field `report_saved_at`.
+- Array embedding mentah tidak dimasukkan ke MongoDB.
 
 Jika `check_id` yang sama digunakan lagi, sistem menolak dengan `409 Conflict`.
+
+### 4. Report Hasil Pengecekan
+
+Report disimpan otomatis saat registrasi metadata berhasil. Report berisi:
+
+- `check_id`
+- status registrasi
+- kandidat internal dan eksternal
+- skor `clip_score`, `cnn_score`, dan `final_score`
+- keputusan sistem
+- alasan keputusan
+- status review manual jika ada
+
+Report dapat dibaca melalui:
+
+```text
+GET /api/v1/metadata/{metadata_id}/report
+```
+
+Report ini dipakai frontend untuk fitur "Lihat Report" pada detail metadata.
 
 ## Validasi Upload
 
@@ -198,6 +284,14 @@ Frontend dan backend membatasi upload:
 - Total piksel maksimal: 40 juta piksel.
 
 Validasi frontend hanya untuk pengalaman user. Validasi utama tetap berada di backend.
+
+Preprocessing gambar:
+
+- Gambar dibaca dari bytes asli, bukan dari thumbnail frontend.
+- Orientasi EXIF dinormalisasi.
+- Gambar dikonversi ke RGB.
+- CLIP dan CNN memakai letterbox/padding agar komposisi gambar tidak terpotong.
+- Thumbnail hanya dipakai untuk tampilan UI, bukan sebagai sumber embedding gambar upload.
 
 ## Konfigurasi
 
@@ -247,6 +341,18 @@ Rebuild service tertentu setelah perubahan kode:
 docker compose up -d --build api-gateway upload-service copyright-metadata-service
 ```
 
+Contoh rebuild setelah perubahan preprocessing atau web search:
+
+```powershell
+docker compose up -d --build feature-extraction-service web-search-service
+```
+
+Contoh rebuild setelah perubahan orchestrator upload:
+
+```powershell
+docker compose up -d --build upload-service
+```
+
 Matikan container tanpa menghapus data:
 
 ```powershell
@@ -266,6 +372,13 @@ http://localhost:8080/docs
 ```
 
 Walaupun service berjalan di Docker, browser tetap memakai `localhost`, bukan nama service Docker seperti `api-gateway`.
+
+Catatan Docker Desktop:
+
+- Docker image dan build cache dapat memakan banyak ruang disk.
+- Jika build macet atau Docker mengembalikan error `500`, cek ruang disk Docker.
+- Jangan gunakan `docker compose down -v` kecuali memang ingin menghapus data MongoDB/Milvus.
+- Jika memungkinkan, simpan Docker disk image di drive yang memiliki ruang besar.
 
 ## Menjalankan Frontend
 
@@ -320,6 +433,7 @@ http://localhost:8080
 | GET | `/api/v1/metadata/{metadata_id}` | Detail metadata |
 | PUT | `/api/v1/metadata/{metadata_id}` | Update metadata |
 | DELETE | `/api/v1/metadata/{metadata_id}` | Hapus metadata, vector Milvus, dan gambar Cloudinary |
+| GET | `/api/v1/metadata/{metadata_id}/report` | Ambil report pengecekan metadata |
 
 ## Evaluasi Similarity
 
@@ -339,7 +453,13 @@ Jalankan:
 
 ```powershell
 cd "E:\Hafizh Code\Capstone2\digital-copyright-system"
-python .\scripts\evaluate_similarity.py
+feature-extraction-service\venv\Scripts\python.exe .\scripts\evaluate_similarity.py --pairs .\evaluation_dataset\pairs.csv --output .\reports\similarity_evaluation.csv
+```
+
+Atau jika virtual environment sudah aktif:
+
+```powershell
+python .\scripts\evaluate_similarity.py --pairs .\evaluation_dataset\pairs.csv --output .\reports\similarity_evaluation.csv
 ```
 
 Hasil evaluasi berada di:
@@ -359,6 +479,22 @@ Metrik yang dicatat:
 - False Negative
 - True Negative
 
+Parameter default evaluasi:
+
+| Parameter | Nilai |
+|---|---:|
+| CLIP weight | `0.4` |
+| CNN weight | `0.6` |
+| CLIP threshold | `0.88` |
+| CNN threshold | `0.75` |
+| Final threshold | `0.82` |
+
+Catatan evaluasi:
+
+- Jalankan ulang evaluasi setelah mengubah preprocessing gambar.
+- Jika preprocessing berubah, embedding lama di Milvus perlu dibuat ulang agar konsisten.
+- Jangan menyimpulkan kualitas sistem dari satu gambar saja; gunakan seluruh dataset evaluasi.
+
 ## Catatan Keamanan
 
 - Frontend hanya mengakses API Gateway.
@@ -367,6 +503,45 @@ Metrik yang dicatat:
 - CORS API Gateway harus dibatasi ke domain frontend.
 - Secret disimpan di `.env`, bukan `settings.yaml`.
 - Untuk user internal, role user belum wajib, tetapi endpoint mutasi tetap lewat gateway.
+- `.env` tidak boleh di-commit.
+- Jika key pernah terlanjur tersebar, lakukan rotate key.
+
+## Troubleshooting Singkat
+
+### Docker build gagal atau macet
+
+1. Cek Docker Engine:
+
+```powershell
+docker info
+```
+
+2. Cek ruang disk.
+
+3. Bersihkan build cache jika Docker sehat:
+
+```powershell
+docker builder prune -a
+```
+
+Jangan tambahkan `--volumes` jika tidak ingin menghapus data.
+
+### Skor similarity eksternal lebih rendah dari ekspektasi
+
+Kemungkinan penyebab:
+
+- kandidat internet masih memakai thumbnail karena gambar asli gagal diunduh;
+- gambar sumber berbeda resolusi, crop, atau kompresi;
+- komposisi gambar berubah;
+- hasil web search menemukan gambar yang mirip tetapi bukan file identik.
+
+Yang dapat dicek:
+
+- `clip_score`
+- `cnn_score`
+- `final_score`
+- `image_url` kandidat eksternal
+- apakah `image_url` masih `encrypted-tbn...` atau sudah URL gambar asli.
 
 ## Dokumentasi Tambahan
 
