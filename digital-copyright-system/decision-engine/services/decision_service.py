@@ -73,6 +73,37 @@ def build_response(score, clip_score, cnn_score, status, risk_level, requires_re
     }  # Menutup response
 
 
+def format_threshold_percent(value):  # Mengubah threshold 0-1 menjadi persen untuk pesan user
+    return f"{float(value) * 100:.0f}%"  # Contoh: 0.55 menjadi 55%
+
+
+def build_range_reason(level, lower_threshold, upper_threshold, threshold_source):  # Membuat alasan berbasis rentang similarity
+    lower_percent = format_threshold_percent(lower_threshold)  # Format batas bawah
+
+    if upper_threshold is None:  # Jika tidak ada batas atas, berarti kategori tertinggi
+        return (
+            f"Kandidat berada pada rentang {level} similarity, "
+            f"yaitu {lower_percent} atau lebih, menggunakan mode {threshold_source}"
+        )  # Alasan high similarity
+
+    upper_percent = format_threshold_percent(upper_threshold)  # Format batas atas
+
+    return (
+        f"Kandidat berada pada rentang {level} similarity, "
+        f"yaitu {lower_percent} sampai kurang dari {upper_percent}, "
+        f"menggunakan mode {threshold_source}"
+    )  # Alasan medium/low similarity
+
+
+def build_very_low_reason(low_threshold, threshold_source):  # Membuat alasan untuk skor sangat rendah
+    low_percent = format_threshold_percent(low_threshold)  # Format threshold low
+
+    return (
+        f"Kandidat berada di bawah rentang low similarity, "
+        f"yaitu kurang dari {low_percent}, menggunakan mode {threshold_source}"
+    )  # Alasan very low similarity
+
+
 def build_decision(overall_score, clip_score=None, cnn_score=None, preset=None, custom_thresholds=None):  # Fungsi utama membuat keputusan
     thresholds, threshold_source = get_thresholds(  # Mengambil threshold yang akan dipakai
         preset=preset,  # Preset dari request
@@ -95,7 +126,7 @@ def build_decision(overall_score, clip_score=None, cnn_score=None, preset=None, 
             "high_similarity",  # Status high similarity
             "high",  # Risiko tinggi
             True,  # Perlu review manual
-            f"Kandidat dengan skor tertinggi melebihi threshold high {high_threshold} menggunakan mode {threshold_source}"  # Alasan
+            build_range_reason("high", high_threshold, None, threshold_source)  # Alasan berbasis rentang
         )  # Menutup build_response
 
     if score >= medium_threshold:  # Mengecek apakah skor masuk kategori medium
@@ -106,7 +137,7 @@ def build_decision(overall_score, clip_score=None, cnn_score=None, preset=None, 
             "medium_similarity",  # Status medium similarity
             "medium",  # Risiko sedang
             True,  # Perlu review manual
-            f"Kandidat dengan skor tertinggi melebihi threshold medium {medium_threshold} menggunakan mode {threshold_source}"  # Alasan
+            build_range_reason("medium", medium_threshold, high_threshold, threshold_source)  # Alasan berbasis rentang
         )  # Menutup build_response
 
     if score >= low_threshold:  # Mengecek apakah skor masuk kategori low
@@ -117,7 +148,7 @@ def build_decision(overall_score, clip_score=None, cnn_score=None, preset=None, 
             "low_similarity",  # Status low similarity
             "low",  # Risiko rendah
             False,  # Tidak wajib review manual
-            f"Kandidat dengan skor tertinggi melebihi threshold low {low_threshold} menggunakan mode {threshold_source}"  # Alasan
+            build_range_reason("low", low_threshold, medium_threshold, threshold_source)  # Alasan berbasis rentang
         )  # Menutup build_response
 
     return build_response(  # Mengembalikan keputusan jika tidak signifikan
@@ -127,7 +158,7 @@ def build_decision(overall_score, clip_score=None, cnn_score=None, preset=None, 
         "no_significant_similarity",  # Status tidak signifikan
         "very_low",  # Risiko sangat rendah
         False,  # Tidak perlu review manual
-        f"Kandidat dengan skor tertinggi berada di bawah threshold low {low_threshold} menggunakan mode {threshold_source}"  # Alasan
+        build_very_low_reason(low_threshold, threshold_source)  # Alasan berbasis rentang
     )  # Menutup build_response
 
 
