@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import csv
@@ -65,18 +65,8 @@ def normalize_label(label: str) -> str:
     )
 
 
-def predict_label(
-    clip_score: float,
-    cnn_score: float,
-    final_score: float,
-    clip_threshold: float,
-    cnn_threshold: float,
-    final_threshold: float,
-) -> str:
-    if clip_score >= clip_threshold and cnn_score >= cnn_threshold:
-        return "plagiarized"
-
-    if final_score >= final_threshold and cnn_score >= cnn_threshold:
+def predict_label(final_score: float, final_threshold: float) -> str:
+    if final_score >= final_threshold:
         return "plagiarized"
 
     return "not_plagiarized"
@@ -88,8 +78,6 @@ async def evaluate_pair(
     label: str,
     clip_weight: float,
     cnn_weight: float,
-    clip_threshold: float,
-    cnn_threshold: float,
     final_threshold: float,
 ) -> PairResult:
     features_a = await extract_features(image_a.read_bytes())
@@ -101,11 +89,7 @@ async def evaluate_pair(
 
     expected = normalize_label(label)
     prediction = predict_label(
-        clip_score=clip_score,
-        cnn_score=cnn_score,
         final_score=final_score,
-        clip_threshold=clip_threshold,
-        cnn_threshold=cnn_threshold,
         final_threshold=final_threshold,
     )
 
@@ -212,11 +196,9 @@ async def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate CLIP/CNN similarity accuracy on labeled image pairs.")
     parser.add_argument("--pairs", required=True, type=Path, help="CSV file with image_a,image_b,label columns.")
     parser.add_argument("--output", default=Path("reports/similarity_evaluation.csv"), type=Path)
-    parser.add_argument("--clip-weight", default=0.4, type=float)
-    parser.add_argument("--cnn-weight", default=0.6, type=float)
-    parser.add_argument("--clip-threshold", default=0.88, type=float)
-    parser.add_argument("--cnn-threshold", default=0.75, type=float)
-    parser.add_argument("--final-threshold", default=0.82, type=float)
+    parser.add_argument("--clip-weight", default=0.5, type=float)
+    parser.add_argument("--cnn-weight", default=0.5, type=float)
+    parser.add_argument("--final-threshold", default=0.80, type=float)
     args = parser.parse_args()
 
     rows = list(read_pairs(args.pairs))
@@ -234,8 +216,6 @@ async def main() -> None:
             label=row["label"],
             clip_weight=args.clip_weight,
             cnn_weight=args.cnn_weight,
-            clip_threshold=args.clip_threshold,
-            cnn_threshold=args.cnn_threshold,
             final_threshold=args.final_threshold,
         )
         results.append(result)
@@ -260,4 +240,6 @@ if __name__ == "__main__":
     import asyncio
 
     asyncio.run(main())
+
+
 
