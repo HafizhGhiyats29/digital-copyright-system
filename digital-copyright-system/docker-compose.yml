@@ -62,6 +62,13 @@
       context: ./feature-extraction-service
     env_file:
       - .env
+    environment:
+      HF_HOME: /root/.cache/huggingface
+      TORCH_HOME: /root/.cache/torch
+    gpus: all
+    restart: unless-stopped
+    volumes:
+      - feature-model-cache:/root/.cache
     networks:
       - digital-copyright-network
 
@@ -188,3 +195,6 @@
 networks:
   digital-copyright-network:
     name: digital-copyright-network
+
+volumes:
+  feature-model-cache:
