@@ -7,8 +7,8 @@ embedding_version_field: "embedding_version"
 clip_vector_field: "clip_embedding"
 cnn_vector_field: "cnn_embedding"
 
-clip_weight: 0.1
-cnn_weight: 0.9
+clip_weight: 0.3
+cnn_weight: 0.7
 
 top_k_internal: 3
 top_k_external: 3
