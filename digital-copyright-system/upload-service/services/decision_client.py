@@ -7,15 +7,20 @@ from utils.internal_auth import internal_auth_headers
 DECISION_SERVICE_URL = config["decision_service_url"]
 
 
+def normalize_score(score):
+    """Clamp cosine scores to the probability range accepted by decision-engine."""
+    return min(1.0, max(0.0, float(score)))
+
+
 async def send_to_decision(overall_score, clip_score=None, cnn_score=None, preset=None, thresholds=None):
     timeout = httpx.Timeout(30.0)
-    body = {"overall_score": overall_score}
+    body = {"overall_score": normalize_score(overall_score)}
 
     if clip_score is not None:
-        body["clip_score"] = clip_score
+        body["clip_score"] = normalize_score(clip_score)
 
     if cnn_score is not None:
-        body["cnn_score"] = cnn_score
+        body["cnn_score"] = normalize_score(cnn_score)
 
     if preset is not None:
         body["preset"] = preset

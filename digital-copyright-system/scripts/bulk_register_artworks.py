@@ -272,8 +272,11 @@ def main() -> None:
                 continue
 
             if previous and previous.get("status") == "registered":
-                print(f"[{index}/{len(rows)}] SKIP {image_id}: checkpoint registered", flush=True)
-                continue
+                print(
+                    f"[{index}/{len(rows)}] RETRY {image_id}: "
+                    "checkpoint is stale; metadata is absent from the API",
+                    flush=True,
+                )
 
             print(f"[{index}/{len(rows)}] PROCESS {image_id}: {row.get('title', '')}", flush=True)
             result = register_one(
