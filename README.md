@@ -4,8 +4,9 @@ Digital Copyright System adalah sistem microservice untuk mengecek kemiripan gam
 
 ## Daftar Isi
 
-- [Fitur Utama](#fitur-utama)
 - [System Requirements](#system-requirements)
+- [Fitur Utama](#fitur-utama)
+- [Ringkasan Perubahan Terbaru](#ringkasan-perubahan-terbaru)
 - [Arsitektur](#arsitektur)
 - [Struktur Folder](#struktur-folder)
 - [Identitas Data](#identitas-data)
@@ -15,8 +16,13 @@ Digital Copyright System adalah sistem microservice untuk mengecek kemiripan gam
 - [Menjalankan Dengan Docker](#menjalankan-dengan-docker)
 - [Menjalankan Frontend](#menjalankan-frontend)
 - [Endpoint Utama](#endpoint-utama)
+- [Bulk Import Dataset Artwork](#bulk-import-dataset-artwork)
+- [Status Pengujian Terakhir](#status-pengujian-terakhir)
+- [Catatan Performa](#catatan-performa)
 - [Evaluasi Similarity](#evaluasi-similarity)
 - [Catatan Keamanan](#catatan-keamanan)
+- [Troubleshooting Singkat](#troubleshooting-singkat)
+- [Dokumentasi Tambahan](#dokumentasi-tambahan)
 
 ## System Requirements
 
@@ -31,7 +37,7 @@ Kebutuhan minimum yang disarankan untuk menjalankan sistem secara lokal:
 | Docker | Docker Desktop dengan Docker Compose |
 | RAM | Minimal 16 GB, disarankan 32 GB untuk model CLIP/CNN |
 | Disk kosong | Minimal 15-20 GB, disarankan lebih besar jika memakai Docker |
-| GPU | Opsional. CUDA dapat mempercepat feature extraction |
+| GPU | Aplikasi dapat berjalan di CPU, tetapi konfigurasi Docker saat ini meminta GPU NVIDIA melalui `gpus: all` |
 
 Kebutuhan layanan eksternal:
 
@@ -68,6 +74,8 @@ Catatan:
 
 - Jika menjalankan seluruh service memakai Docker, pastikan Docker Desktop memiliki ruang disk cukup.
 - Model CLIP dan ResNet50 dapat mengunduh bobot model saat pertama kali dijalankan.
+- Docker Compose saat ini menyimpan cache Hugging Face dan Torch pada volume `feature-model-cache`, sehingga model tidak perlu diunduh ulang setiap container dibuat ulang.
+- Untuk konfigurasi `gpus: all`, Docker Desktop harus dapat mengakses NVIDIA GPU dan driver/CUDA container runtime yang sesuai.
 - Jika preprocessing gambar berubah, embedding lama di Milvus perlu dibuat ulang agar hasil similarity konsisten.
 
 ## Fitur Utama
@@ -88,6 +96,27 @@ Catatan:
 - Registrasi metadata hanya bisa dilakukan dengan `check_id` hasil pengecekan.
 - Anti-duplikasi registrasi metadata berbasis `check_id`.
 - API Gateway sebagai pintu masuk utama.
+
+## Ringkasan Perubahan Terbaru
+
+Perubahan implementasi dan operasional yang sudah diterapkan pada lingkungan lokal:
+
+| Area | Perubahan |
+|---|---|
+| Feature extraction | Mengaktifkan GPU Docker dengan `gpus: all` untuk CLIP dan CNN. |
+| Model cache | Menambahkan `HF_HOME`, `TORCH_HOME`, dan volume persisten `feature-model-cache`. |
+| Ketahanan service | Menambahkan `restart: unless-stopped` pada feature extraction service. |
+| Similarity runtime | Bobot aktif diatur menjadi CLIP `0.3` dan CNN `0.7`, dengan top-k internal/eksternal masing-masing `3`. |
+| Decision request | Skor cosine di-clamp ke `[0, 1]` sebelum validasi decision engine untuk mencegah error `422`. |
+| API Gateway | Timeout request dapat dioverride melalui `REQUEST_TIMEOUT_SECONDS` dan saat ini digunakan nilai `180`. |
+| SerpAPI | Key dari `.env` diterapkan dengan recreate `web-search-service`; secret tidak ditulis ke dokumentasi. |
+| Bulk import | Menambahkan workflow import dataset original melalui API lengkap dengan threshold, checkpoint, retry, dan anti-duplikasi `dataset_image_id`. |
+| Checkpoint | Database/API menjadi sumber kebenaran sehingga checkpoint `registered` yang stale tidak menyebabkan data hilang dilewati. |
+| Cleanup metadata | Endpoint delete gateway membersihkan Cloudinary, Milvus, dan MongoDB sebagai satu alur. |
+| Evaluasi | Menambahkan command evaluasi pasangan transformasi dan output metrik per transformasi. |
+| Pengujian data | Lingkungan diverifikasi dengan total 200 metadata, seluruh embedding `ready`, seluruh URL Cloudinary terisi, dan tanpa kegagalan checkpoint akhir. |
+
+Error download model Hugging Face, resolusi nama service, dan koneksi Cloudinary yang ditemukan sebelumnya dikonfirmasi sebagai masalah jaringan/DNS. Tidak ada workaround fungsional sementara yang dipertahankan pada web search service; solusi operasionalnya adalah memperbaiki jaringan, DNS, firewall, atau proxy container.
 
 ## Arsitektur
 
@@ -313,6 +342,7 @@ CLOUDINARY_API_SECRET=
 CLOUDINARY_FOLDER=copyright-registrations
 INTERNAL_API_KEY=
 CORS_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+REQUEST_TIMEOUT_SECONDS=180
 ```
 
 Prinsip konfigurasi:
@@ -320,6 +350,19 @@ Prinsip konfigurasi:
 - `settings.yaml` untuk default lokal yang aman masuk Git.
 - `.env` untuk secret dan override environment.
 - Jangan commit `.env` berisi key asli.
+- Perubahan `.env` tidak otomatis masuk ke container yang sedang berjalan. Container terkait harus dibuat ulang.
+
+Konfigurasi runtime similarity saat ini berada di `digital-copyright-system/similarity-check-service/config/settings.yaml`:
+
+| Parameter | Nilai |
+|---|---:|
+| CLIP weight | `0.3` |
+| CNN weight | `0.7` |
+| Internal top-k | `3` |
+| External top-k | `3` |
+| Milvus metric | `COSINE` |
+
+Skor cosine dinormalisasi ke rentang `[0, 1]` sebelum dikirim ke decision engine. Normalisasi ini mencegah error `422 Unprocessable Entity` ketika hasil floating-point sedikit lebih besar dari `1.0`, misalnya `1.00000008`.
 
 ## Menjalankan Dengan Docker
 
@@ -353,6 +396,30 @@ Contoh rebuild setelah perubahan orchestrator upload:
 docker compose up -d --build upload-service
 ```
 
+Terapkan ulang perubahan `.env` tanpa rebuild image:
+
+```powershell
+docker compose up -d --force-recreate
+```
+
+Jika hanya `SERPAPI_KEY` atau konfigurasi web search yang berubah:
+
+```powershell
+docker compose up -d --force-recreate --no-deps web-search-service
+```
+
+Jika hanya bobot similarity berubah:
+
+```powershell
+docker compose up -d --build --no-deps similarity-check-service
+```
+
+Jika timeout gateway berubah:
+
+```powershell
+docker compose up -d --force-recreate --no-deps api-gateway
+```
+
 Matikan container tanpa menghapus data:
 
 ```powershell
@@ -372,6 +439,14 @@ http://localhost:8080/docs
 ```
 
 Walaupun service berjalan di Docker, browser tetap memakai `localhost`, bukan nama service Docker seperti `api-gateway`.
+
+Konfigurasi khusus feature extraction pada Docker Compose:
+
+- `gpus: all` mengaktifkan GPU untuk CLIP dan CNN.
+- `HF_HOME=/root/.cache/huggingface` menyimpan cache model Hugging Face.
+- `TORCH_HOME=/root/.cache/torch` menyimpan cache model Torch.
+- Volume `feature-model-cache:/root/.cache` mempertahankan model setelah container di-recreate.
+- `restart: unless-stopped` membuat feature service kembali aktif setelah Docker restart.
 
 Catatan Docker Desktop:
 
@@ -435,6 +510,99 @@ http://localhost:8080
 | DELETE | `/api/v1/metadata/{metadata_id}` | Hapus metadata, vector Milvus, dan gambar Cloudinary |
 | GET | `/api/v1/metadata/{metadata_id}/report` | Ambil report pengecekan metadata |
 
+Penghapusan metadata melalui gateway diorkestrasi sebagai satu alur. Gateway mengambil referensi metadata terlebih dahulu, lalu menghapus gambar Cloudinary, vector Milvus, dan dokumen MongoDB. Jangan menghapus dokumen MongoDB secara langsung jika resource Cloudinary dan Milvus juga harus dibersihkan.
+
+## Bulk Import Dataset Artwork
+
+Script bulk import tersedia di:
+
+```text
+digital-copyright-system/scripts/bulk_register_artworks.py
+```
+
+Script ini memasukkan gambar original dari `evaluation_dataset/artworks_met` melalui alur aplikasi yang sama dengan upload manual:
+
+```text
+gambar original
+  -> POST /api/v1/upload
+  -> ekstraksi CLIP dan CNN
+  -> web search SerpAPI
+  -> similarity internal dan eksternal
+  -> decision engine
+  -> approval dataset pengujian jika diperlukan
+  -> upload permanen Cloudinary
+  -> metadata MongoDB
+  -> embedding Milvus
+```
+
+Jalankan dari folder `digital-copyright-system`:
+
+```powershell
+.\feature-extraction-service\venv\Scripts\python.exe scripts\bulk_register_artworks.py --limit 199 --high-threshold 0.98 --medium-threshold 0.97 --low-threshold 0.96 --approve-review --request-timeout 240
+```
+
+Arti parameter penting:
+
+| Parameter | Fungsi |
+|---|---|
+| `--limit` | Jumlah baris dataset yang dipertimbangkan dari posisi `--start` |
+| `--start` | Posisi awal dataset, default `0` |
+| `--high-threshold` | Batas high similarity, default `0.98` |
+| `--medium-threshold` | Batas medium similarity, default `0.97` |
+| `--low-threshold` | Batas low similarity, default `0.96` |
+| `--approve-review` | Approve otomatis hasil review/blocked khusus dataset CC0/Public Domain untuk pengujian |
+| `--request-timeout` | Timeout client bulk import dalam detik |
+
+Ketentuan bulk import:
+
+- Gunakan `--approve-review` hanya untuk dataset pengujian yang lisensinya sudah diketahui, bukan untuk upload pengguna umum.
+- Setiap metadata dataset diberi penanda `dataset_image_id=<image_id>` pada deskripsi.
+- API/database menjadi sumber kebenaran. Checkpoint CSV lama tidak menyebabkan data yang sudah terhapus dari database dilewati.
+- Script aman dijalankan ulang: data yang masih ada di API dilewati berdasarkan `dataset_image_id`, sedangkan checkpoint yang sudah stale akan dicoba ulang.
+- Progres dan error disimpan setelah setiap gambar ke `reports/bulk_artwork_registration.csv`.
+- Jika targetnya 200 metadata total dan database sudah memiliki satu metadata non-dataset, gunakan `--limit 199`. Jika database benar-benar kosong dan seluruh 200 artwork ingin dimasukkan, gunakan `--limit 200`.
+- Setiap gambar dapat memakai satu pencarian SerpAPI. Pastikan kuota key mencukupi sebelum memulai import besar.
+
+## Status Pengujian Terakhir
+
+Verifikasi bulk import terakhir dilakukan pada 13 Juli 2026 melalui API Gateway dan menghasilkan:
+
+| Pemeriksaan | Hasil |
+|---|---:|
+| Total metadata | `200` |
+| Artwork original dari dataset | `199` |
+| Metadata awal non-dataset | `1` |
+| `dataset_image_id` unik | `199` |
+| Embedding berstatus `ready` | `200` |
+| Metadata dengan URL Cloudinary | `200` |
+| URL gambar kosong | `0` |
+| Gagal pada checkpoint akhir | `0` |
+| Frontend `http://localhost:4173/` | HTTP `200` |
+
+Hasil ini adalah snapshot lingkungan lokal pengujian, bukan fixture yang dijamin selalu sama. Jumlah dapat berubah setelah operasi tambah atau hapus metadata.
+
+## Catatan Performa
+
+Jumlah vector 100 atau 200 bukan penyebab utama perubahan waktu upload pada pengujian saat ini. Similarity internal hanya mengambil top-3 dari Milvus dan umumnya selesai jauh di bawah satu detik.
+
+Contoh pengukuran satu request yang membutuhkan sekitar 25 detik:
+
+| Tahap | Perkiraan waktu |
+|---|---:|
+| Ekstraksi embedding gambar asli | `0.12` detik |
+| Web search, termasuk Cloudinary, SerpAPI, dan kandidat | `24.88` detik |
+| Similarity Milvus dan enrichment metadata | `0.05` detik |
+| Decision engine | `0.01` detik |
+
+Kesimpulan performa:
+
+- Latensi paling besar dan paling berubah-ubah berasal dari jaringan eksternal, terutama Google Lens melalui SerpAPI.
+- Web search juga mengunduh maksimal tiga kandidat dan membuat embedding kandidat secara paralel.
+- Gambar asli dari kandidat dicoba lebih dulu; thumbnail dipakai sebagai fallback.
+- Respons SerpAPI dapat selesai cepat pada satu request dan membutuhkan lebih dari 20 detik pada request lain.
+- `REQUEST_TIMEOUT_SECONDS=180` dipakai agar API Gateway tidak memotong request web search yang valid pada detik ke-60.
+- Bandingkan performa memakai beberapa request dan catat waktu per tahap; jangan menyimpulkan skalabilitas Milvus hanya dari total waktu endpoint upload.
+
 ## Evaluasi Similarity
 
 Dataset evaluasi berada di:
@@ -468,6 +636,19 @@ Hasil evaluasi berada di:
 digital-copyright-system/reports/similarity_evaluation.csv
 ```
 
+Evaluasi pasangan transformasi dapat dijalankan dalam satu baris:
+
+```powershell
+.\feature-extraction-service\venv\Scripts\python.exe scripts\evaluate_similarity.py --pairs evaluation_dataset\pairs_transformations.csv --output reports\similarity_evaluation_transformations.csv --metrics-output reports\similarity_metrics_by_transformation.csv
+```
+
+Output evaluasi transformasi:
+
+```text
+digital-copyright-system/reports/similarity_evaluation_transformations.csv
+digital-copyright-system/reports/similarity_metrics_by_transformation.csv
+```
+
 Metrik yang dicatat:
 
 - Accuracy
@@ -488,6 +669,8 @@ Parameter default evaluasi:
 | CLIP threshold | `0.88` |
 | CNN threshold | `0.75` |
 | Final threshold | `0.82` |
+
+Bobot pada tabel evaluasi berasal dari default script evaluasi dan dapat berbeda dari bobot runtime service (`CLIP 0.3`, `CNN 0.7`). Saat membandingkan laporan evaluasi dengan perilaku website, pastikan kedua konfigurasi menggunakan bobot yang sama.
 
 Catatan evaluasi:
 
@@ -542,6 +725,58 @@ Yang dapat dicek:
 - `final_score`
 - `image_url` kandidat eksternal
 - apakah `image_url` masih `encrypted-tbn...` atau sudah URL gambar asli.
+
+### Docker gagal mengunduh model Hugging Face
+
+Gejala umum:
+
+```text
+OSError: Can't load the configuration of 'openai/clip-vit-base-patch32'
+```
+
+Yang perlu diperiksa:
+
+1. Pastikan container memiliki koneksi internet dan DNS dapat menyelesaikan `huggingface.co`.
+2. Pastikan tidak ada firewall, proxy, atau jaringan kampus/kantor yang memblokir Hugging Face.
+3. Coba jaringan lain jika koneksi ditolak atau DNS gagal.
+4. Setelah model berhasil diunduh, volume `feature-model-cache` akan menyimpan cache untuk startup berikutnya.
+
+### Cloudinary connection refused
+
+Gejala umum:
+
+```text
+MaxRetryError
+Failed to establish a new connection
+Connection refused
+```
+
+Error ini umumnya berasal dari jaringan container menuju `api.cloudinary.com`, bukan dari algoritma web search. Periksa koneksi, DNS Docker, firewall, proxy, dan coba jaringan lain sebelum mengubah implementasi service.
+
+### Service Docker tidak menemukan service lain
+
+Gejala umum:
+
+```text
+httpx.ConnectError: [Errno -2] Name or service not known
+```
+
+Pastikan:
+
+- semua container berada pada network `digital-copyright-network`;
+- URL antar-container memakai nama service Compose, misalnya `http://feature-extraction-service:8002`;
+- browser/host memakai `localhost`, bukan nama service Docker;
+- container tujuan berstatus `Up` dan sudah menyelesaikan startup.
+
+### Perubahan `.env` belum digunakan container
+
+Periksa nilai aktif tanpa menampilkan secret, lalu recreate service yang memakai variabel tersebut. Untuk SerpAPI:
+
+```powershell
+docker compose up -d --force-recreate --no-deps web-search-service
+```
+
+`SERPAPI_KEY` dibaca saat module web search di-import, sehingga restart/recreate diperlukan. Jangan menampilkan key asli pada README, terminal bersama, screenshot, atau log aplikasi.
 
 ## Dokumentasi Tambahan
 
